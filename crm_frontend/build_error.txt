@@ -1,0 +1,86 @@
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m???[39m 4 modules transformed.
+node.exe : [31mx[39m 
+Build failed in 115ms
+At C:\Program Files\nod
+ejs\npx.ps1:29 char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ([31mx[39m B   
+ uild failed in 115    
+ms:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+[31merror during 
+build:
+[31m[@tailwindcss/vite
+:generate:build] 
+Cannot apply unknown 
+utility class 
+`border-border`[31m
+file: [36mD:/Muksid/Ry
+ze/CRM_MAIN/crm_fronten
+d/src/index.css[31m
+    at 
+onInvalidCandidate (fil
+e:///D:/Muksid/Ryze/CRM
+_MAIN/crm_frontend/node
+_modules/tailwindcss/di
+st/chunk-L5IEUH3R.mjs:2
+1:1511)
+    at $e (file:///D:/M
+uksid/Ryze/CRM_MAIN/crm
+_frontend/node_modules/
+tailwindcss/dist/chunk-
+L5IEUH3R.mjs:16:37066)
+    at file:///D:/Muksi
+d/Ryze/CRM_MAIN/crm_fro
+ntend/node_modules/tail
+windcss/dist/chunk-L5IE
+UH3R.mjs:21:355
+    at Ar (file:///D:/M
+uksid/Ryze/CRM_MAIN/crm
+_frontend/node_modules/
+tailwindcss/dist/chunk-
+L5IEUH3R.mjs:3:1733)
+    at I (file:///D:/Mu
+ksid/Ryze/CRM_MAIN/crm_
+frontend/node_modules/t
+ailwindcss/dist/chunk-L
+5IEUH3R.mjs:3:1377)
+    at Ce (file:///D:/M
+uksid/Ryze/CRM_MAIN/crm
+_frontend/node_modules/
+tailwindcss/dist/chunk-
+L5IEUH3R.mjs:21:172)
+    at Gi (file:///D:/M
+uksid/Ryze/CRM_MAIN/crm
+_frontend/node_modules/
+tailwindcss/dist/chunk-
+L5IEUH3R.mjs:38:294)
+    at async ao (file:/
+//D:/Muksid/Ryze/CRM_MA
+IN/crm_frontend/node_mo
+dules/tailwindcss/dist/
+chunk-L5IEUH3R.mjs:38:6
+31)
+    at async vf (file:/
+//D:/Muksid/Ryze/CRM_MA
+IN/crm_frontend/node_mo
+dules/tailwindcss/dist/
+chunk-L5IEUH3R.mjs:38:1
+406)
+    at async uu (file:/
+//D:/Muksid/Ryze/CRM_MA
+IN/crm_frontend/node_mo
+dules/@tailwindcss/node
+/dist/index.mjs:10:3458
+)[39m
