@@ -23,6 +23,7 @@ from app.api.bulk import router as bulk_router
 # 3. CRM Data (Pod A/B)
 from app.api.contacts import router as contacts_router
 from app.api.messages import router as messages_router
+from app.api.deals import router as deals_router
 
 # 4. Finance (Pod B)
 from app.api.finance import router as finance_router
@@ -60,6 +61,7 @@ api_router.include_router(bulk_router, prefix="/bulk", tags=["Bulk Messaging"])
 api_router.include_router(contacts_router, tags=["Contacts"]) 
 api_router.include_router(messages_router, tags=["Messages"]) 
 api_router.include_router(leads_router, prefix="/leads", tags=["Leads"])
+api_router.include_router(deals_router, prefix="/deals", tags=["Deals"])
 
 # Finance
 api_router.include_router(finance_router, prefix="/finance", tags=["Finance"])

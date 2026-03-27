@@ -15,3 +15,25 @@ export interface LeadUpdate {
     email?: string;
     status?: LeadStatus;
 }
+
+export interface ContactOut {
+    id: number;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    custom_fields: Record<string, any> | null;
+    tenant_id: number | null;
+    owner_id: number;
+    created_at: string;
+}
+
+export interface DealOut {
+    id: number;
+    lead_id: number;
+    value_cents: number;
+    seller_id: number | null;
+    tenant_id: number;
+    created_at: string;
+}
+
+

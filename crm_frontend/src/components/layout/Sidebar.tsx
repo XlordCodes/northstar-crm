@@ -1,10 +1,12 @@
-import { Home, Users, Inbox, Database, Settings } from "lucide-react"
+import { Home, Inbox, Database, Settings, Target, BookUser, CircleDollarSign } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
 export function Sidebar() {
     const navItems = [
         { icon: Home, label: "Home", to: "/" },
-        { icon: Users, label: "Pipeline", to: "/pipeline" },
+        { icon: CircleDollarSign, label: "Finance", to: "/deals" },
+        { icon: BookUser, label: "Contacts", to: "/contacts" },
+        { icon: Target, label: "Pipeline", to: "/pipeline" },
         { icon: Inbox, label: "Inbox", to: "/inbox" },
         { icon: Database, label: "Database", to: "/database" },
     ]

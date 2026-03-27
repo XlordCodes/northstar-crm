@@ -6,6 +6,8 @@ import { QueryProvider } from "./providers/QueryProvider"
 import Login from "./pages/Login"
 import Dashboard from "./pages/Dashboard"
 import Pipeline from "./pages/Pipeline"
+import { Contacts } from "./pages/Contacts"
+import { Deals } from "./pages/Deals"
 import { Toaster } from "@/components/ui/sonner"
 
 function App() {
@@ -20,6 +22,8 @@ function App() {
               <Route path="/" element={<RootLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="pipeline" element={<Pipeline />} />
+                <Route path="contacts" element={<Contacts />} />
+                <Route path="deals" element={<Deals />} />
               </Route>
             </Route>
           </Routes>

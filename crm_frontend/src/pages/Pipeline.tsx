@@ -4,7 +4,7 @@ import { LeadOut } from '@/types/crm';
 import { KanbanView } from '@/components/pipeline/KanbanView';
 import { ListView } from '@/components/pipeline/ListView';
 import { LeadDrawer } from '@/components/pipeline/LeadDrawer';
-import { LayoutGrid, List, AlertCircle, Inbox } from 'lucide-react';
+import { LayoutGrid, List, AlertCircle, Inbox, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Pipeline() {
@@ -32,24 +32,29 @@ export default function Pipeline() {
             <div className="flex items-center justify-between shrink-0 mb-8">
                 <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Sales Pipeline</h1>
 
-                <div className="flex items-center bg-white rounded-lg p-1 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-slate-100/50">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setView('kanban')}
-                        className={`h-8 px-3 rounded-md transition-all shadow-none ${view === 'kanban' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <LayoutGrid className="w-4 h-4 mr-2" />
-                        Board
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setView('list')}
-                        className={`h-8 px-3 rounded-md transition-all shadow-none ${view === 'list' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <List className="w-4 h-4 mr-2" />
-                        List
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center bg-white rounded-lg p-1 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-slate-100/50">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setView('kanban')}
+                            className={`h-8 px-3 rounded-md transition-all shadow-none ${view === 'kanban' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <LayoutGrid className="w-4 h-4 mr-2" />
+                            Board
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setView('list')}
+                            className={`h-8 px-3 rounded-md transition-all shadow-none ${view === 'list' ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <List className="w-4 h-4 mr-2" />
+                            List
+                        </Button>
+                    </div>
+                    <Button className="bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-none">
+                        <Plus className="w-4 h-4 mr-2" /> New Lead
                     </Button>
                 </div>
             </div>

@@ -9,6 +9,7 @@ Used for ad-hoc generation tasks not covered by specific services.
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+import openai
 from openai import OpenAI
 from app.authentication.router import get_current_user
 from app.models import User
@@ -47,5 +48,20 @@ def generate_text(
         
         return {"text": response.choices[0].message.content.strip()}
         
+    except openai.RateLimitError as e:
+        raise HTTPException(
+            status_code=429, 
+            detail="AI provider rate limit exceeded or out of credits. Please back off and try again later."
+        )
+    except openai.AuthenticationError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid AI API Key."
+        )
+    except openai.APIError as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"AI Provider Error: {str(e)}"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Provider Error: {str(e)}")
