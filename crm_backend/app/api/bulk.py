@@ -14,20 +14,23 @@ from datetime import datetime, timezone
 # --- Imports ---
 from app.database import get_db
 from app.models.auth import User
-from app.models.bulk import BulkJob # Type hinting
 from app.schemas.bulk import BulkJobCreate, BulkJobResponse, BulkJobStatus
 from app.authentication.router import get_current_user
 from app.services.bulk_service import BulkService
 
-# Import the Celery task
+# Import the Celery tasks
 from app.tasks.whatsapp_tasks import process_bulk_whatsapp_job
+from app.tasks.email_tasks import send_email_task
 
 router = APIRouter()
+
+def get_service(db: Session = Depends(get_db)) -> BulkService:
+    return BulkService(db)
 
 @router.post("/jobs", response_model=BulkJobResponse, status_code=status.HTTP_201_CREATED)
 def create_bulk_job(
     job_request: BulkJobCreate, 
-    db: Session = Depends(get_db),
+    service: BulkService = Depends(get_service),
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -37,37 +40,27 @@ def create_bulk_job(
     If 'scheduled_at' is in the past or null, the job triggers immediately.
     If in the future, it is saved as 'scheduled' (to be picked up by Celery Beat).
     """
-    # 1. Security: Enforce Tenant Context
     if not current_user.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="User is not associated with a valid tenant."
         )
 
-    # 2. Logic: Determine Schedule
-    # If a date is provided and is in the future, we mark it as 'scheduled'.
-    # Otherwise, it defaults to 'queued' for immediate processing.
     initial_status = "queued"
     target_time = job_request.scheduled_at
 
     if target_time:
         now = datetime.now(timezone.utc)
-        # Ensure target is timezone-aware
         if target_time.tzinfo is None:
             target_time = target_time.replace(tzinfo=timezone.utc)
-
         if target_time > now:
             initial_status = "scheduled"
         else:
-            # Past/Current time means run now
-            # We explicitly clear target_time so the Service sees it as immediate
             target_time = None 
 
-    # 3. Execution: Delegate to Service
-    # The Service handles the high-performance bulk insert of messages
-    svc = BulkService(db)
-    
-    new_job = svc.create_job(
+    channel = getattr(job_request, "channel", "whatsapp") or "whatsapp"
+
+    new_job = service.create_job(
         tenant_id=current_user.tenant_id,
         template_name=job_request.template_name,
         language_code=job_request.language_code,
@@ -77,31 +70,57 @@ def create_bulk_job(
         status=initial_status
     )
 
-    # 4. Async Trigger: Fire Celery Task
-    # Only fire if it's meant to run immediately. 
-    # Scheduled jobs are picked up by a separate "Beat" task (cron).
     if new_job.status == "queued":
-        process_bulk_whatsapp_job.delay(new_job.id)
+        if channel == "email":
+            emails = getattr(job_request, "emails", []) or []
+            email_subject = getattr(job_request, "email_subject", "") or ""
+            email_body = getattr(job_request, "email_body", "") or ""
+            for email_addr in emails:
+                email_job = service.create_email_job(
+                    tenant_id=current_user.tenant_id,
+                    to_email=email_addr,
+                    subject=email_subject,
+                    template_name="custom",
+                    context={"body": email_body},
+                )
+                send_email_task.delay(email_job.id)
+        else:
+            process_bulk_whatsapp_job.delay(new_job.id)
 
     return new_job
+
+@router.get("/jobs", response_model=list[BulkJobResponse])
+def list_bulk_jobs(
+    skip: int = 0,
+    limit: int = 50,
+    service: BulkService = Depends(get_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List all bulk jobs for the current tenant.
+    Enforces tenant isolation via service layer.
+    """
+    return service.list_jobs(
+        tenant_id=current_user.tenant_id,
+        skip=skip,
+        limit=limit
+    )
 
 @router.get("/jobs/{job_id}", response_model=BulkJobStatus)
 def get_job_status(
     job_id: int, 
-    db: Session = Depends(get_db),
+    service: BulkService = Depends(get_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Get the status and message details of a bulk job.
-    Enforces tenant isolation (users can only see their own organization's jobs).
+    Enforces tenant isolation via service layer.
     """
-    job = db.get(BulkJob, job_id)
-    
-    # Security Check: Ensure job exists AND belongs to the user's tenant
+    job = service.get_job_status(
+        tenant_id=current_user.tenant_id,
+        job_id=job_id
+    )
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-        
-    if job.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="Job not found")
     
     return job

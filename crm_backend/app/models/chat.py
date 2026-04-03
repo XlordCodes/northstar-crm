@@ -47,8 +47,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(Integer, primary_key=True)
-    tenant_id = Column(Integer, index=True, nullable=True)
-
+    tenant_id = Column(Integer, index=True, nullable=False)
     customer_number = Column(String, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -65,7 +64,8 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True)
-    conversation_id = Column(Integer, ForeignKey("conversations.id"))
+    tenant_id = Column(Integer, index=True, nullable=False)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), index=True)
     
     # Stores the WhatsApp Message ID (wamid) to link status updates & embeddings
     message_id = Column(String, unique=True, index=True, nullable=True)

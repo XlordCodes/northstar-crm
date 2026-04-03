@@ -14,12 +14,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.sentiment_service import SentimentService
 from app.services.reply_service import ReplyService
-from app.models import ChatMessage
+from app.models import ChatMessage, User
+from app.authentication.router import get_current_user
 
 router = APIRouter()
 
 @router.post("/sentiment/{message_id}")
-def tag_sentiment(message_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def tag_sentiment(message_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """
     Manually trigger sentiment analysis for a message.
     
@@ -38,7 +39,10 @@ def tag_sentiment(message_id: int, db: Session = Depends(get_db)) -> Dict[str, A
         HTTPException 404: If the message_id does not exist in the database.
     """
     # Verify message existence before initializing heavy services
-    msg = db.get(ChatMessage, message_id)
+    msg = db.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.tenant_id == current_user.tenant_id
+    ).first()
     if not msg:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
@@ -52,7 +56,7 @@ def tag_sentiment(message_id: int, db: Session = Depends(get_db)) -> Dict[str, A
     return {"message_id": message_id, "sentiment": result}
 
 @router.post("/replies/{convo_id}")
-def suggest_replies(convo_id: int, db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+def suggest_replies(convo_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> List[Dict[str, Any]]:
     """
     Generate AI-suggested replies based on conversation history and similar past cases.
 
@@ -78,7 +82,7 @@ def suggest_replies(convo_id: int, db: Session = Depends(get_db)) -> List[Dict[s
     svc = ReplyService(db)
     
     try:
-        suggestions = svc.suggest_replies(convo_id)
+        suggestions = svc.suggest_replies(current_user.tenant_id, convo_id)
         
         # Serialize the SQLAlchemy objects to a JSON-compatible list
         return [

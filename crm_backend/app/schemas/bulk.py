@@ -23,13 +23,16 @@ class BulkMessage(BulkMessageBase):
 # ----------------------------
 
 class BulkJobCreate(BaseModel):
-    """Schema for creating a new job."""
-    template_name: str = Field(..., description="WhatsApp template name.")
+    """Schema for creating a new bulk messaging job."""
+    channel: str = Field("whatsapp", description="Channel: 'whatsapp' or 'email'.")
+    template_name: str = Field("", description="WhatsApp template name. Required for WhatsApp channel.")
     language_code: str = Field("en_US", description="Language code.")
-    numbers: List[str] = Field(..., min_length=1, description="List of phone numbers.")
-    
+    numbers: List[str] = Field(default_factory=list, description="List of phone numbers for WhatsApp.")
+    emails: List[str] = Field(default_factory=list, description="List of email addresses for Email channel.")
+    email_subject: Optional[str] = Field(None, description="Email subject line.")
+    email_body: Optional[str] = Field(None, description="Email body content.")
     scheduled_at: Optional[datetime] = Field(None, description="Schedule time.")
-    components: Optional[List[dict]] = Field(None, description="Template variables.")
+    components: Optional[List[dict]] = Field(None, max_length=50, description="Template variables.")
 
 
 class BulkJobResponse(BaseModel):

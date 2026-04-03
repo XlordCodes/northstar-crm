@@ -26,32 +26,37 @@ class RoleRepo:
         """
         self.db = db
 
-    def get_by_name(self, name: str) -> Optional[Role]:
+    def get_by_name(self, name: str, tenant_id: int | None = None) -> Optional[Role]:
         """
-        Retrieves a specific role by its unique name (case-insensitive).
+        Retrieves a specific role by its unique name, scoped to a tenant.
         
         Args:
             name (str): The name of the role (e.g., 'admin', 'manager').
+            tenant_id (int | None): The tenant ID to scope the search. If None, searches globally (system roles).
             
         Returns:
             Optional[Role]: The Role object if found, otherwise None.
         """
-        return self.db.query(Role).filter(
+        query = self.db.query(Role).filter(
             func.lower(Role.name) == name.lower()
-        ).first()
+        )
+        if tenant_id is not None:
+            query = query.filter(Role.tenant_id == tenant_id)
+        return query.first()
 
-    def create_role(self, name: str, description: Optional[str] = None) -> Role:
+    def create_role(self, name: str, tenant_id: int | None = None, description: Optional[str] = None) -> Role:
         """
-        Creates a new system role.
+        Creates a new system role scoped to a tenant.
         
         Args:
             name (str): Unique name for the role.
+            tenant_id (int | None): The tenant ID to scope this role to.
             description (Optional[str]): Human-readable description.
             
         Returns:
             Role: The persisted Role object.
         """
-        role = Role(name=name, description=description)
+        role = Role(name=name, tenant_id=tenant_id, description=description)
         self.db.add(role)
         self.db.commit()
         self.db.refresh(role)
@@ -92,15 +97,19 @@ class RoleRepo:
             return user.role
         return None
 
-    def list_roles(self, skip: int = 0, limit: int = 100) -> List[Role]:
+    def list_roles(self, tenant_id: int | None = None, skip: int = 0, limit: int = 100) -> List[Role]:
         """
-        Lists all available system roles.
+        Lists roles scoped to a specific tenant.
         
         Args:
+            tenant_id (int | None): The tenant ID to filter by. If None, returns all roles.
             skip (int): Pagination offset.
             limit (int): Pagination limit.
             
         Returns:
             List[Role]: A list of Role objects.
         """
-        return self.db.query(Role).offset(skip).limit(limit).all()
+        query = self.db.query(Role)
+        if tenant_id is not None:
+            query = query.filter(Role.tenant_id == tenant_id)
+        return query.offset(skip).limit(limit).all()

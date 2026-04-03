@@ -52,7 +52,10 @@ def embed_message(
         HTTPException 400: If the embedding service rejects the input (e.g. empty text).
         HTTPException 500: If an internal server or AI service error occurs.
     """
-    msg = db.get(ChatMessage, message_id)
+    msg = db.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.tenant_id == current_user.tenant_id
+    ).first()
     if not msg:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
@@ -65,7 +68,7 @@ def embed_message(
         vector = svc.embed_text(msg.text)
         
         # Store with explicit commit to ensure data durability immediately
-        svc.store_embedding(message_id, vector, commit=True)
+        svc.store_embedding(current_user.tenant_id, message_id, vector, commit=True)
         
         return {"status": "embedded", "message_id": message_id}
         
@@ -114,7 +117,7 @@ def find_similar(
         vector = svc.embed_text(text)
         
         # Perform similarity search in DB
-        results = svc.search_similar(vector, limit=limit)
+        results = svc.search_similar(current_user.tenant_id, vector, limit=limit)
         
         # Format results (SQLAlchemy returns tuples)
         return [
@@ -155,7 +158,7 @@ def summarize_conversation(
     """
     try:
         svc = SummaryService(db)
-        summary = svc.summarize_conversation(cid)
+        summary = svc.summarize_conversation(current_user.tenant_id, cid)
         return {"conversation_id": cid, "summary": summary}
     except Exception as e:
         raise HTTPException(

@@ -149,7 +149,8 @@ class InventoryService:
                 entity="Product",
                 entity_id=product.id,
                 action="create",
-                changes=schema.model_dump(mode='json') 
+                changes=schema.model_dump(mode='json'),
+                tenant_id=tenant_id
             )
             
             # 4. Commit Transaction
@@ -234,7 +235,8 @@ class InventoryService:
                 "change": adjustment.qty,
                 "reason": adjustment.reason,
                 "new_stock": new_level
-            }
+            },
+            tenant_id=tenant_id
         )
         
         # 5. Commit Atomic Transaction

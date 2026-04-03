@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # --- Multi-Tenancy ---
+    # Default tenant ID for webhook processing and system-level operations.
+    # In production, this should be resolved per-phone-number mapping.
+    DEFAULT_TENANT_ID: int = 1
+
     # --- WhatsApp Integration ---
     # Credentials for the Meta Graph API.
     WHATSAPP_APP_SECRET: str

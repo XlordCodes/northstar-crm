@@ -72,6 +72,7 @@ async def get_contacts(
     - Uses Read-Through Caching (Redis).
     """
     return await service.list_contacts(
+        tenant_id=current_user.tenant_id,
         owner_id=current_user.id, 
         skip=skip, 
         limit=limit
@@ -87,7 +88,7 @@ async def get_contact(
     Get a specific contact by ID.
     """
     try:
-        return await service.get_contact(contact_id, current_user.id)
+        return await service.get_contact(contact_id, current_user.id, current_user.tenant_id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")
 
@@ -104,7 +105,7 @@ async def update_contact(
     - Clears the cache for this user.
     """
     try:
-        return await service.update_contact(contact_id, current_user.id, contact_update)
+        return await service.update_contact(contact_id, current_user.id, current_user.tenant_id, contact_update)
     except ValueError as e:
         # Check if error message implies 'Not Found' or 'Conflict'
         if "not found" in str(e).lower():
@@ -121,7 +122,7 @@ async def delete_contact(
     Delete a contact.
     """
     try:
-        await service.delete_contact(contact_id, current_user.id)
+        await service.delete_contact(contact_id, current_user.id, current_user.tenant_id)
         return {"status": "deleted"}
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")

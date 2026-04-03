@@ -14,15 +14,15 @@ async def test_auth_flow(client: AsyncClient):
     # Unique email to avoid collision
     random_id = uuid.uuid4().hex[:8]
     email = f"tester_{random_id}@ryze.com"
-    password = "secure_password_123"
+    password = "SecurePass123!"
 
     # 1. Register
     # FIX: Updated path to match router.py (/v1/api/auth/register)
+    # FIX: Password now compliant with new complexity rules (uppercase, lowercase, digit, special char)
     reg_payload = {
         "email": email, 
         "password": password, 
-        "name": "Integration Tester",
-        "tenant_id": 1  # Often required for tenant isolation logic
+        "name": "Integration Tester"
     }
     
     res = await client.post("/v1/api/auth/register", json=reg_payload)

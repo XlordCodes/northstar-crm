@@ -18,7 +18,7 @@ from app.core.config import settings
 router = APIRouter()
 
 class PromptRequest(BaseModel):
-    prompt: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1, max_length=2000)
     max_tokens: int = Field(150, ge=10, le=500)
 
 @router.post("/generate")

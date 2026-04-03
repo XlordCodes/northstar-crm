@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 
 from app.models.audit import AuditLog, ActivityFeed
 from app.repos.audit_repo import AuditRepo, ActivityRepo
+from app.models.auth import User
 
 # Import context helpers
 try:
@@ -26,6 +27,38 @@ class AuditService:
         self.audit_repo = AuditRepo(db)
         self.activity_repo = ActivityRepo(db)
 
+    def list_logs(
+        self,
+        tenant_id: int,
+        entity: str | None = None,
+        limit: int = 50,
+        skip: int = 0
+    ) -> list[AuditLog]:
+        """
+        Retrieves audit logs scoped to tenant via User join.
+        """
+        query = self.db.query(AuditLog).join(
+            User, AuditLog.actor_id == User.id
+        ).filter(
+            User.tenant_id == tenant_id
+        )
+        if entity:
+            query = query.filter(AuditLog.entity == entity)
+
+        from sqlalchemy import desc
+        return (
+            query.order_by(desc(AuditLog.created_at))
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def get_activity(self, user_id: int, limit: int = 20) -> list[ActivityFeed]:
+        """
+        Fetches recent activity for a specific user.
+        """
+        return self.activity_repo.recent_for_user(user_id=user_id, limit=limit)
+
     def log_event(
         self, 
         actor_id: Optional[int], 
@@ -33,7 +66,8 @@ class AuditService:
         entity_id: int, 
         action: str, 
         changes: Dict[str, Any] = None,
-        meta: Dict[str, Any] = None
+        meta: Dict[str, Any] = None,
+        tenant_id: Optional[int] = None
     ) -> AuditLog:
         """
         Records a compliance event.
@@ -48,7 +82,8 @@ class AuditService:
         # --- CRITICAL MAPPING ---
         # The Model expects 'actor_id', NOT 'user_id'.
         log = AuditLog(
-            actor_id=actor_id,   # <--- Correct Field Name
+            tenant_id=tenant_id or 1,
+            actor_id=actor_id,
             entity=entity,
             entity_id=entity_id,
             action=action,

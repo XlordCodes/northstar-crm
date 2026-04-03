@@ -129,6 +129,7 @@ def seed():
         for msg_data in messages_data:
             msg_time = base_time + timedelta(minutes=msg_data["delay_minutes"])
             chat_msg = ChatMessage(
+                tenant_id=1,
                 conversation_id=conversation.id,
                 text=msg_data["text"],
                 sentiment=msg_data["sentiment"],

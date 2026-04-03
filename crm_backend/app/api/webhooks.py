@@ -100,7 +100,7 @@ class WhatsAppStatusUpdate(BaseModel):
     status: str = Field(..., description="Status: sent, delivered, read, failed")
     timestamp: str = Field(..., description="Unix timestamp as string")
     recipient_id: Optional[str] = None
-    errors: Optional[List[Dict[str, Any]]] = None
+    errors: Optional[List[Dict[str, Any]]] = Field(None, max_length=10)
     
     @validator('status')
     def validate_status(cls, v):
@@ -117,9 +117,9 @@ class WhatsAppValue(BaseModel):
     """
     messaging_product: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
-    contacts: Optional[List[Dict[str, Any]]] = None
-    messages: Optional[List[WhatsAppMessage]] = None
-    statuses: Optional[List[WhatsAppStatusUpdate]] = None
+    contacts: Optional[List[Dict[str, Any]]] = Field(None, max_length=50)
+    messages: Optional[List[WhatsAppMessage]] = Field(None, max_length=50)
+    statuses: Optional[List[WhatsAppStatusUpdate]] = Field(None, max_length=50)
 
 
 class WhatsAppChange(BaseModel):
@@ -135,7 +135,7 @@ class WhatsAppEntry(BaseModel):
     An entry in the webhook payload (Meta can batch multiple entries).
     """
     id: str
-    changes: List[WhatsAppChange]
+    changes: List[WhatsAppChange] = Field(..., max_length=10)
 
 
 class WhatsAppWebhookPayload(BaseModel):
@@ -146,7 +146,7 @@ class WhatsAppWebhookPayload(BaseModel):
     Invalid payloads are rejected early to prevent injection attacks.
     """
     object: str = Field(..., description="Should be 'whatsapp_business_account'")
-    entry: List[WhatsAppEntry]
+    entry: List[WhatsAppEntry] = Field(..., max_length=10)
     
     @validator('object')
     def validate_object_type(cls, v):
@@ -309,6 +309,7 @@ async def whatsapp_webhook(
     # ========================================================================
     chat_svc = ChatService(db)
     status_svc = StatusService(db)
+    webhook_tenant_id = settings.DEFAULT_TENANT_ID
     
     # ========================================================================
     # STEP 5: PROCESS VALIDATED ENTRIES
@@ -337,7 +338,7 @@ async def whatsapp_webhook(
                                 text_body = text_body[:MAX_TEXT_LENGTH]
                             
                             # Save to DB (ChatService handles Contact lookup logic)
-                            chat_svc.save_incoming(sender, text_body, message_id=wamid)
+                            chat_svc.save_incoming(webhook_tenant_id, sender, text_body, message_id=wamid)
                             logger.info(f"📩 Saved message {wamid} from {sender}")
                         
                         # Future: Add handlers for other message types (image, audio, etc.)
@@ -364,7 +365,7 @@ async def whatsapp_webhook(
                             error_data = json.dumps(status_update.errors)
                         
                         # Update the BulkMessage or ChatMessage status
-                        status_svc.update_status(wamid, status_state, error_data)
+                        status_svc.update_status(webhook_tenant_id, wamid, status_state, error_data)
                         logger.debug(f"📊 Status update for {wamid}: {status_state}")
                         
                     except Exception as e:

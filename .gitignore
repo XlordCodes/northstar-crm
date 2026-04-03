@@ -14,3 +14,10 @@ ENV/
 .vscode/
 .idea/
 celerybeat-schedule
+.agent/
+.kilo/
+ui_ux_utf8.md
+ui_ux_design.md
+opencode.json
+audit_logs.txt
+NORTHSTAR_AUDIT.md

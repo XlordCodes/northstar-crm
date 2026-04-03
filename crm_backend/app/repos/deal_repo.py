@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from app.models.crm import Deal
+from app.models.auth import User
 
 class DealRepo:
     """
@@ -30,6 +31,7 @@ class DealRepo:
     def create(self, tenant_id: int, lead_id: int, value_cents: int, seller_id: Optional[int] = None) -> Deal:
         """
         Creates a new Deal record linked to a specific Lead.
+        Validates that the seller belongs to the correct tenant.
         
         Args:
             tenant_id (int): The tenant context for this data.
@@ -40,6 +42,14 @@ class DealRepo:
         Returns:
             Deal: The newly created and persisted Deal object.
         """
+        # Validate seller belongs to the correct tenant
+        if seller_id is not None:
+            seller = self.db.query(User).filter(User.id == seller_id).first()
+            if not seller:
+                raise ValueError("Invalid seller_id: User not found.")
+            if seller.tenant_id != tenant_id:
+                raise ValueError("Invalid seller_id: User belongs to another tenant.")
+
         deal = Deal(
             tenant_id=tenant_id,
             lead_id=lead_id,

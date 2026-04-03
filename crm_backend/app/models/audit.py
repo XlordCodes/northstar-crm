@@ -21,6 +21,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, index=True, nullable=False)
     
     # Actor: The user who performed the action. 
     # Nullable because some actions are performed by the system (e.g., automated billing).

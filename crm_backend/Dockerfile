@@ -31,9 +31,14 @@ RUN chmod +x /code/entrypoint.sh
 # 4. Copy application code
 COPY . /code
 
-# 5. Define the entrypoint
+# 5. Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -d /code -s /sbin/nologin appuser
+RUN chown -R appuser:appuser /code
+USER appuser
+
+# 6. Define the entrypoint
 # This script will wait for the DB, run migrations, then start the app
 ENTRYPOINT ["/code/entrypoint.sh"]
 
-# 6. Default Command (can be overridden by docker-compose for celery)
+# 7. Default Command (can be overridden by docker-compose for celery)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

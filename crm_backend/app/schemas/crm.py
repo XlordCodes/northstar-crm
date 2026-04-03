@@ -22,7 +22,8 @@ class ContactBase(BaseModel):
     email: Optional[EmailStr] = Field(None, description="Email address")
     phone: Optional[str] = Field(None, description="E.164 formatted phone number")
     custom_fields: Optional[Dict[str, Any]] = Field(
-        default_factory=dict, 
+        default_factory=dict,
+        max_length=10,
         description="Arbitrary JSON data for custom attributes (e.g., source, preferences)"
     )
 
@@ -101,6 +102,17 @@ class LeadCreate(BaseModel):
     """Payload for creating a new Lead."""
     name: str = Field(..., min_length=2, description="Full name of the lead")
     email: Optional[EmailStr] = Field(None, description="Contact email")
+    phone: Optional[str] = Field(None, description="E.164 formatted phone number")
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        clean_number = re.sub(r'[\s\-\(\)]', '', v)
+        if not re.match(r'^\+?[1-9]\d{9,14}$', clean_number):
+            raise ValueError('Phone number must be in valid E.164 format')
+        return clean_number
 
 class LeadUpdate(BaseModel):
     """
@@ -111,13 +123,25 @@ class LeadUpdate(BaseModel):
     """
     name: Optional[str] = Field(None, min_length=2, description="Full name of the lead")
     email: Optional[EmailStr] = Field(None, description="Contact email")
+    phone: Optional[str] = Field(None, description="E.164 formatted phone number")
     status: Optional[LeadStatus] = Field(None, description="Update the current pipeline stage")
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        clean_number = re.sub(r'[\s\-\(\)]', '', v)
+        if not re.match(r'^\+?[1-9]\d{9,14}$', clean_number):
+            raise ValueError('Phone number must be in valid E.164 format')
+        return clean_number
 
 class LeadOut(BaseModel):
     """Response model for Lead details."""
     id: int
     name: str
     email: Optional[EmailStr] = None
+    phone: Optional[str] = None
     status: LeadStatus
     created_at: datetime
     tenant_id: int

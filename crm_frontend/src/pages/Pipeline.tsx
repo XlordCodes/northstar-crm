@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useLeads } from '@/hooks/useLeads';
+import { useCreateLead } from '@/hooks/useCreateLead';
 import { LeadOut } from '@/types/crm';
 import { KanbanView } from '@/components/pipeline/KanbanView';
 import { ListView } from '@/components/pipeline/ListView';
 import { LeadDrawer } from '@/components/pipeline/LeadDrawer';
 import { LayoutGrid, List, AlertCircle, Inbox, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function Pipeline() {
     const [view, setView] = useState<'kanban' | 'list'>('kanban');
@@ -13,6 +17,12 @@ export default function Pipeline() {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
     const { data: leads, isLoading, isError } = useLeads();
+    const createLead = useCreateLead();
+
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
 
     const handleLeadClick = (lead: LeadOut) => {
         setSelectedLead(lead);
@@ -21,8 +31,25 @@ export default function Pipeline() {
 
     const closeDrawer = () => {
         setIsDrawerOpen(false);
-        // Optional: delay clearing selected lead until animation finishes
         setTimeout(() => setSelectedLead(null), 300);
+    };
+
+    const handleSubmit = async () => {
+        if (!name.trim()) return;
+
+        try {
+            await createLead.mutateAsync({
+                name: name.trim(),
+                email: email.trim() || undefined,
+                phone: phone.trim() || undefined,
+            });
+            setName('');
+            setEmail('');
+            setPhone('');
+            setSheetOpen(false);
+        } catch (error) {
+            // Handled globally
+        }
     };
 
     return (
@@ -53,9 +80,62 @@ export default function Pipeline() {
                             List
                         </Button>
                     </div>
-                    <Button className="bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-none">
-                        <Plus className="w-4 h-4 mr-2" /> New Lead
-                    </Button>
+                    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                        <SheetTrigger asChild>
+                            <Button className="bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-none cursor-pointer">
+                                <Plus className="w-4 h-4 mr-2" /> New Lead
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="w-[400px] sm:max-w-md bg-white border-l border-zinc-100 p-8">
+                            <SheetHeader className="mb-8">
+                                <SheetTitle className="text-xl font-bold tracking-tight text-zinc-900">New Lead</SheetTitle>
+                                <SheetDescription className="hidden">Form details</SheetDescription>
+                            </SheetHeader>
+                            <div className="space-y-6 mt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="lead-name" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Full Name *</Label>
+                                    <Input
+                                        id="lead-name"
+                                        placeholder="John Doe"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full bg-[#f3f3f3] border-none border-b-2 border-transparent focus-visible:border-zinc-900 focus-visible:ring-0 transition-all px-4 py-6 text-sm font-medium rounded-none shadow-none text-zinc-900"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="lead-email" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Email Address</Label>
+                                    <Input
+                                        id="lead-email"
+                                        placeholder="john@example.com"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full bg-[#f3f3f3] border-none border-b-2 border-transparent focus-visible:border-zinc-900 focus-visible:ring-0 transition-all px-4 py-6 text-sm font-medium rounded-none shadow-none text-zinc-900"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="lead-phone" className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Phone Number (Optional)</Label>
+                                    <Input
+                                        id="lead-phone"
+                                        placeholder="+14155552671"
+                                        type="tel"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        className="w-full bg-[#f3f3f3] border-none border-b-2 border-transparent focus-visible:border-zinc-900 focus-visible:ring-0 transition-all px-4 py-6 text-sm font-medium rounded-none shadow-none text-zinc-900"
+                                    />
+                                </div>
+                                <div className="pt-8">
+                                    <Button
+                                        onClick={handleSubmit}
+                                        disabled={createLead.isPending || !name.trim()}
+                                        className="w-full py-6 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold uppercase tracking-[0.2em] transition-all rounded-sm shadow-none cursor-pointer disabled:opacity-50"
+                                    >
+                                        {createLead.isPending ? 'Creating...' : 'Create Lead'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
                 </div>
             </div>
 

@@ -52,6 +52,7 @@ class MessageEmbedding(Base):
     __tablename__ = "message_embeddings"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, index=True, nullable=False)
     message_id = Column(Integer, ForeignKey("chat_messages.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     # [CRITICAL UPDATE] 

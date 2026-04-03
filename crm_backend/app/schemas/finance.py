@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 # --- SHARED BASES ---
 
 class InvoiceItemBase(BaseModel):
-    description: str = Field(..., min_length=3, description="Line item description")
+    description: str = Field(..., min_length=3, max_length=500, description="Line item description")
     quantity: int = Field(default=1, gt=0, description="Quantity, must be positive")
     unit_price: Decimal = Field(..., gt=0, decimal_places=2, description="Price per unit")
 

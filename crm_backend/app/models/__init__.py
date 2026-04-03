@@ -11,6 +11,7 @@ This file is the Single Source of Truth for the DB schema.
 from app.database import Base
 
 # 2. Auth & Core
+from .tenant import Tenant
 from .auth import User, Role
 
 # 3. Audit & Activity (Pod B Module 3)
@@ -33,7 +34,7 @@ from .inventory import Product, StockTransaction
 # Export for Alembic
 __all__ = [
     "Base",
-    "User", "Role", 
+    "User", "Role", "Tenant", 
     "AuditLog", "ActivityFeed",
     "Contact", "Lead", "Deal",
     "Message", "Conversation", "ChatMessage",

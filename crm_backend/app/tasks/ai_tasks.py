@@ -56,7 +56,7 @@ def process_message_ai(self, message_id: int):
             vector = embed_svc.embed_text(msg.text)
             
             # Store in pgvector column
-            embed_svc.store_embedding(msg.id, vector)
+            embed_svc.store_embedding(msg.tenant_id, msg.id, vector)
             logger.info(f"AI Task: Msg {msg.id} embedded successfully.")
             
         except Exception as e:

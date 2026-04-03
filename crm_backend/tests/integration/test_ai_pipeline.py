@@ -25,6 +25,7 @@ def test_ai_task_flow(db_session: Session):
     # --- 1. SETUP: Create a Message via ChatService ---
     chat_svc = ChatService(db_session)
     msg = chat_svc.save_incoming(
+        tenant_id=1,
         from_number="+919999999999",
         text="I am very unhappy with the delay in my order."
     )

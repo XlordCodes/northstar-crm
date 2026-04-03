@@ -31,10 +31,10 @@ class AuditLogOut(BaseModel):
     entity_id: Optional[int] = Field(None, description="ID of the affected resource")
     
     # Detailed changes stored as JSON
-    changes: Optional[Dict[str, Any]] = Field(default={}, description="Snapshot of changes")
+    changes: Optional[Dict[str, Any]] = Field(default={}, max_length=10, description="Snapshot of changes")
     
     # Metadata (IP, etc)
-    meta: Optional[Dict[str, Any]] = Field(default={}, description="Request metadata")
+    meta: Optional[Dict[str, Any]] = Field(default={}, max_length=10, description="Request metadata")
     
     # Actor info (Optional because system events might have no user)
     actor_id: Optional[int]

@@ -5,6 +5,7 @@ Context: Pod C - AI Intelligence
 
 Generates smart reply suggestions using RAG (Retrieval Augmented Generation).
 Combines OpenAI GPT with Vector Search for context-aware answers.
+All operations are tenant-scoped to prevent cross-tenant data leakage.
 """
 
 import logging
@@ -24,18 +25,20 @@ class ReplyService:
         self.vector_svc = EmbeddingService(db)
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
 
-    def suggest_replies(self, conversation_id: int, top_k: int = 3) -> List[ReplySuggestion]:
+    def suggest_replies(self, tenant_id: int, conversation_id: int, top_k: int = 3) -> List[ReplySuggestion]:
         """
         Generates reply suggestions using OpenAI + Vector Search.
+        All queries are scoped to tenant to prevent data leakage.
         """
         if not self.client:
             logger.error("OPENAI_API_KEY is missing. Cannot generate replies.")
             return []
 
-        # 1. Fetch Current Context (Last 5 messages)
+        # 1. Fetch Current Context (Last 5 messages) — scoped to tenant
         msgs = (
             self.db.query(ChatMessage)
-            .filter(ChatMessage.conversation_id == conversation_id)
+            .filter(ChatMessage.tenant_id == tenant_id,
+                    ChatMessage.conversation_id == conversation_id)
             .order_by(ChatMessage.created_at.desc())
             .limit(5)
             .all()
@@ -50,21 +53,21 @@ class ReplyService:
         # Format history (Chronological)
         history_text = "\n".join(f"User: {m.text}" if m.from_number else f"Agent: {m.text}" for m in reversed(msgs))
         
-        # 2. RAG Retrieval: Search for similar past resolved cases
+        # 2. RAG Retrieval: Search for similar past resolved cases — scoped to tenant
         knowledge_context = ""
         if last_customer_msg and last_customer_msg.text:
             try:
-                # A. Generate vector (OpenAI)
                 query_vec = self.vector_svc.embed_text(last_customer_msg.text)
-                
-                # B. Search DB
-                similar_results = self.vector_svc.search_similar(query_vec, limit=2)
+                similar_results = self.vector_svc.search_similar(tenant_id, query_vec, limit=2)
                 
                 if similar_results:
                     knowledge_context = "Relevant Past Responses:\n"
                     for res in similar_results:
                         msg_id = res[0]
-                        past_msg = self.db.get(ChatMessage, msg_id) 
+                        past_msg = self.db.query(ChatMessage).filter(
+                            ChatMessage.id == msg_id,
+                            ChatMessage.tenant_id == tenant_id
+                        ).first()
                         if past_msg and past_msg.text:
                             knowledge_context += f"- {past_msg.text}\n"
             except Exception as e:

@@ -20,17 +20,13 @@ def list_conversations(
 ):
     """
     Lists active conversations ordered by the most recent message.
-    
-    - **skip**: Number of conversations to skip (for pagination).
-    - **limit**: Maximum number of conversations to return (default 50).
-    - **Requires**: Authentication.
+    Scoped to the authenticated user's tenant.
     """
-    conversations = (
-        db.query(Conversation)
-        .order_by(Conversation.last_message_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+    chat_svc = ChatService(db)
+    conversations = chat_svc.list_conversations(
+        tenant_id=current_user.tenant_id,
+        skip=skip,
+        limit=limit
     )
     return conversations
 
@@ -43,10 +39,6 @@ def get_messages(
 ):
     """
     Fetches message history for a specific conversation ID.
-    
-    - **cid**: Conversation ID.
-    - **limit**: Number of messages to retrieve (default 50).
-    - **Requires**: Authentication.
+    Scoped to the authenticated user's tenant.
     """
-    # We rely on the Service layer for the logic, keeping the router clean
-    return ChatService(db).list_conversation(cid, limit=limit)
+    return ChatService(db).list_conversation(current_user.tenant_id, cid, limit=limit)

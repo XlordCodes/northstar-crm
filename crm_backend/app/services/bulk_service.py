@@ -15,7 +15,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.models.bulk import BulkJob, BulkMessage
+from app.models.bulk import BulkJob, BulkMessage, EmailQueue
 # Import Unified Client
 from app.integrations.whatsapp_client import whatsapp_client
 
@@ -94,6 +94,69 @@ class BulkService:
             self.db.rollback()
             logger.error(f"Failed to create bulk job: {e}")
             raise e
+
+    def create_email_job(
+        self,
+        tenant_id: int,
+        to_email: str,
+        subject: str,
+        template_name: str,
+        context: Optional[dict] = None,
+    ) -> EmailQueue:
+        """
+        Creates a single email queue entry for async delivery.
+        
+        Args:
+            tenant_id (int): Security context (stored for audit).
+            to_email (str): Recipient email address.
+            subject (str): Email subject line.
+            template_name (str): Template identifier or 'custom'.
+            context (dict): Template variables or body content.
+            
+        Returns:
+            EmailQueue: The created email job instance.
+        """
+        try:
+            email_job = EmailQueue(
+                tenant_id=tenant_id,
+                to_email=to_email,
+                subject=subject,
+                template_name=template_name,
+                context=context or {},
+                status="pending",
+            )
+            self.db.add(email_job)
+            self.db.commit()
+            self.db.refresh(email_job)
+            logger.info(f"Created Email Job {email_job.id} to {to_email}")
+            return email_job
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Failed to create email job: {e}")
+            raise e
+
+    def list_jobs(self, tenant_id: int, skip: int = 0, limit: int = 50) -> List[BulkJob]:
+        """
+        Lists bulk jobs for a specific tenant, ordered by creation date.
+        """
+        return (
+            self.db.query(BulkJob)
+            .filter(BulkJob.tenant_id == tenant_id)
+            .order_by(BulkJob.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def get_job_status(self, tenant_id: int, job_id: int) -> Optional[BulkJob]:
+        """
+        Fetches a bulk job by ID, scoped to tenant.
+        """
+        return (
+            self.db.query(BulkJob)
+            .filter(BulkJob.id == job_id, BulkJob.tenant_id == tenant_id)
+            .first()
+        )
 
     def run_job(self, job_id: int) -> Optional[BulkJob]:
         """

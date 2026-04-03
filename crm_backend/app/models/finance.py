@@ -36,7 +36,7 @@ class InvoiceItem(Base):
     __tablename__ = "invoice_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False, index=True)
     
     description = Column(String, nullable=False)
     quantity = Column(Integer, default=1)
@@ -49,7 +49,7 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, index=True, nullable=False)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False, index=True)
     
     amount = Column(Numeric(10, 2), nullable=False)
     method = Column(String, default="bank_transfer") # stripe, cash, bank_transfer

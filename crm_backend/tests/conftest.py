@@ -194,7 +194,7 @@ def mock_celery_tasks(monkeypatch):
 
 @pytest.fixture(scope="function")
 def test_user(db_session):
-    password = "test_password"
+    password = "SecurePass123!"
     hashed = hash_password(password)
     email = f"user_{uuid.uuid4().hex[:8]}@example.com"
     

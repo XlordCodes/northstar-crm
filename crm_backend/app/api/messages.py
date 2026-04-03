@@ -75,6 +75,7 @@ def get_messages(
     - Returns: List of AI-ready 'ChatMessage' objects.
     """
     return service.list_messages(
+        tenant_id=current_user.tenant_id,
         from_number=from_number, 
         message_type=message_type, 
         limit=limit
@@ -90,7 +91,7 @@ def get_message(
     Get a single message by ID.
     """
     try:
-        return service.get_message(message_id)
+        return service.get_message(current_user.tenant_id, message_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Message not found")
 
@@ -110,6 +111,7 @@ def create_message(
     """
     try:
         return service.save_incoming(
+            tenant_id=current_user.tenant_id,
             from_number=message.from_number,
             text=message.text,
             message_type=message.message_type
@@ -131,7 +133,7 @@ def delete_message(
     Hard delete a message.
     """
     try:
-        service.delete_message(message_id)
+        service.delete_message(current_user.tenant_id, message_id)
         return {"status": "deleted"}
     except ValueError:
         raise HTTPException(status_code=404, detail="Message not found")

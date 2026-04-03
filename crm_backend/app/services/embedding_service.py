@@ -5,6 +5,7 @@ Context: Pod C - Module 5 (AI RAG)
 
 Generates vector embeddings for chat messages using the OpenAI API.
 Stores vectors in PostgreSQL using pgvector for semantic search.
+All operations are tenant-scoped to prevent cross-tenant data leakage.
 
 ARCHITECTURAL NOTE:
 - Model: text-embedding-3-small
@@ -18,7 +19,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-from app.models.extensions import MessageEmbedding # Ensuring correct import
+from app.models.extensions import MessageEmbedding
+from app.models import ChatMessage
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -42,8 +44,6 @@ class EmbeddingService:
             logger.error("OPENAI_API_KEY is not configured.")
             raise ValueError("OPENAI_API_KEY is not configured.")
 
-        # Sanitize input: OpenAI has a hard token limit (8191 tokens), but 
-        # usually 10k chars is a safe rough limit to prevent 400 errors.
         safe_text = text[:20000] 
 
         payload = {
@@ -67,26 +67,27 @@ class EmbeddingService:
             if "data" not in data or not data["data"]:
                 raise ValueError("Invalid response from OpenAI API")
             
-            # OpenAI returns a list of objects, we take the first one
             return data["data"][0]["embedding"]
             
         except requests.exceptions.RequestException as e:
             logger.warning(f"OpenAI API connection failed (attempting retry): {e}")
             raise
 
-    def store_embedding(self, message_id: int, vector: List[float], commit: bool = True) -> MessageEmbedding:
+    def store_embedding(self, tenant_id: int, message_id: int, vector: List[float], commit: bool = True) -> MessageEmbedding:
         """
-        Save the vector to the database.
+        Save the vector to the database, scoped to tenant.
         Checks for existing records to ensure idempotency.
         """
-        # Check if embedding already exists to prevent duplicates
-        existing = self.db.query(MessageEmbedding).filter_by(message_id=message_id).first()
+        existing = self.db.query(MessageEmbedding).filter(
+            MessageEmbedding.message_id == message_id,
+            MessageEmbedding.tenant_id == tenant_id
+        ).first()
         
         if existing:
-            existing.embedding = vector  # Update existing
+            existing.embedding = vector
             emb = existing
         else:
-            emb = MessageEmbedding(message_id=message_id, embedding=vector)
+            emb = MessageEmbedding(tenant_id=tenant_id, message_id=message_id, embedding=vector)
             self.db.add(emb)
         
         if commit:
@@ -95,21 +96,21 @@ class EmbeddingService:
             
         return emb
 
-    def search_similar(self, vector: List[float], limit: int = 5):
+    def search_similar(self, tenant_id: int, vector: List[float], limit: int = 5):
         """
         Search for similar messages using Cosine Distance via pgvector.
+        STRICTLY scoped to tenant to prevent cross-tenant data leakage.
         """
-        # Using the specific pgvector operator <=> (cosine distance)
-        # We must cast the vector to string for the SQL parameter
         sql = text("""
             SELECT message_id, embedding <=> :vec as distance 
             FROM message_embeddings
+            WHERE tenant_id = :tenant_id
             ORDER BY distance ASC
             LIMIT :limit
         """)
         
         try:
-            rows = self.db.execute(sql, {"vec": str(vector), "limit": limit}).fetchall()
+            rows = self.db.execute(sql, {"vec": str(vector), "tenant_id": tenant_id, "limit": limit}).fetchall()
             return rows
         except Exception as e:
             logger.error(f"Error executing similarity search: {e}")

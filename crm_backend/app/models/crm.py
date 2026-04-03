@@ -94,12 +94,13 @@ class Lead(Base):
     
     name = Column(String, nullable=False)
     email = Column(String, nullable=True, index=True)
+    phone = Column(String, nullable=True, index=True)
     status = Column(String, default="new", index=True) # new, contacted, qualified, converted
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Ownership for RBAC
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
     # Relationships
     owner = relationship("app.models.auth.User")
@@ -123,7 +124,7 @@ class Deal(Base):
     value_cents = Column(Integer, nullable=False, default=0)
     
     # Sales attribution
-    seller_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     

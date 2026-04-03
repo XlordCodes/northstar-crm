@@ -41,13 +41,9 @@ def create_role(
     Create a new system role (e.g., 'editor', 'auditor').
     Restricted to Admins.
     """
-    # Note: We access the repo through the service layer, or add a wrapper in service.
-    # For simplicity, we assume the service might expose a direct create method, 
-    # or we use the repo attached to the service if strict layering allows.
-    # To maintain strict service-layer pattern, we should add 'create_role' to RBACService.
-    # For now, we will use the internal repo of the service.
     return service.role_repo.create_role(
         name=payload.name, 
+        tenant_id=current_user.tenant_id,
         description=payload.description
     )
 
@@ -62,7 +58,7 @@ def list_roles(
     List all available roles in the system.
     Restricted to Admins.
     """
-    return service.role_repo.list_roles(skip=skip, limit=limit)
+    return service.role_repo.list_roles(tenant_id=current_user.tenant_id, skip=skip, limit=limit)
 
 @router.post("/users/{user_id}/assign", response_model=RoleOut)
 def assign_role_to_user(
@@ -77,7 +73,7 @@ def assign_role_to_user(
     Restricted to Admins.
     """
     # 1. Update User Role
-    updated_user = service.assign_role_by_name(user_id, payload.role_name)
+    updated_user = service.assign_role_by_name(user_id, payload.role_name, tenant_id=current_user.tenant_id)
     
     # 2. Return the assigned role details
     # We rely on the relationship being loaded or fetch it directly

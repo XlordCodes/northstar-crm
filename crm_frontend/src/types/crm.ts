@@ -4,6 +4,7 @@ export interface LeadOut {
     id: number;
     name: string;
     email: string | null;
+    phone: string | null;
     status: LeadStatus;
     created_at: string;
     tenant_id: number;
@@ -36,4 +37,16 @@ export interface DealOut {
     created_at: string;
 }
 
+// --- Create DTOs (mirrors backend Pydantic schemas) ---
 
+export interface ContactCreate {
+    name: string;
+    email?: string;
+    phone?: string;
+}
+
+export interface LeadCreate {
+    name: string;
+    email?: string;
+    phone?: string;
+}

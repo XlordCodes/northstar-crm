@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.models.crm import Contact
+from app.models.auth import User
 from app.schemas.crm import ContactCreate, ContactUpdate, ContactOut
 from app.core.cache import get_cache, set_cache, invalidate_cache
 
@@ -25,7 +26,15 @@ class ContactService:
     async def create_contact(self, tenant_id: int, owner_id: int, data: ContactCreate) -> Contact:
         """
         Creates a new contact and invalidates the list cache.
+        Validates that the owner belongs to the requesting tenant.
         """
+        # Validate owner belongs to the correct tenant
+        owner = self.db.query(User).filter(User.id == owner_id).first()
+        if not owner:
+            raise ValueError("Invalid owner_id: User not found.")
+        if owner.tenant_id != tenant_id:
+            raise ValueError("Invalid owner_id: User belongs to another tenant.")
+
         db_contact = Contact(
             tenant_id=tenant_id,
             owner_id=owner_id,
@@ -48,9 +57,10 @@ class ContactService:
             self.db.rollback()
             raise ValueError("Contact with this phone or email already exists.")
 
-    async def list_contacts(self, owner_id: int, skip: int = 0, limit: int = 100) -> List[ContactOut]:
+    async def list_contacts(self, tenant_id: int, owner_id: int, skip: int = 0, limit: int = 100) -> List[ContactOut]:
         """
         Fetches contacts with Read-Through Caching.
+        Enforces tenant isolation via tenant_id filter.
         """
         cache_key = f"contacts:{owner_id}:{skip}:{limit}"
         
@@ -67,7 +77,7 @@ class ContactService:
         # 2. Query DB
         contacts = (
             self.db.query(Contact)
-            .filter(Contact.owner_id == owner_id)
+            .filter(Contact.owner_id == owner_id, Contact.tenant_id == tenant_id)
             .order_by(Contact.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -87,14 +97,16 @@ class ContactService:
         # Return the ORM objects (FastAPI will serialize them to JSON automatically)
         return contacts 
 
-    async def get_contact(self, contact_id: int, owner_id: int) -> Contact:
+    async def get_contact(self, contact_id: int, owner_id: int, tenant_id: int) -> Contact:
         """
-        Fetches a single contact. 
+        Fetches a single contact.
+        Enforces tenant isolation via tenant_id filter.
         Note: We generally don't cache individual item lookups unless high traffic.
         """
         contact = self.db.query(Contact).filter(
             Contact.id == contact_id, 
-            Contact.owner_id == owner_id
+            Contact.owner_id == owner_id,
+            Contact.tenant_id == tenant_id
         ).first()
         
         if not contact:
@@ -102,12 +114,13 @@ class ContactService:
             
         return contact
 
-    async def update_contact(self, contact_id: int, owner_id: int, data: ContactUpdate) -> Contact:
+    async def update_contact(self, contact_id: int, owner_id: int, tenant_id: int, data: ContactUpdate) -> Contact:
         """
         Updates a contact and invalidates cache.
+        Enforces tenant isolation via tenant_id filter.
         """
-        # Fetch first to ensure ownership
-        contact = await self.get_contact(contact_id, owner_id)
+        # Fetch first to ensure ownership and tenant
+        contact = await self.get_contact(contact_id, owner_id, tenant_id)
         
         # Update fields dynamically
         update_data = data.model_dump(exclude_unset=True)
@@ -125,11 +138,12 @@ class ContactService:
             self.db.rollback()
             raise ValueError("Update conflict: Email/Phone already in use.")
 
-    async def delete_contact(self, contact_id: int, owner_id: int):
+    async def delete_contact(self, contact_id: int, owner_id: int, tenant_id: int):
         """
         Deletes a contact and invalidates cache.
+        Enforces tenant isolation via tenant_id filter.
         """
-        contact = await self.get_contact(contact_id, owner_id)
+        contact = await self.get_contact(contact_id, owner_id, tenant_id)
         
         self.db.delete(contact)
         self.db.commit()

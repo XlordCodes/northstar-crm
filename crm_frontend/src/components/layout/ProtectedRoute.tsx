@@ -6,8 +6,8 @@ export function ProtectedRoute() {
 
     if (isLoading) {
         return (
-            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex h-screen w-full items-center justify-center bg-zinc-50">
+                <div className="w-6 h-6 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }

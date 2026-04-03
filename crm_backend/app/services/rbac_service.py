@@ -30,13 +30,14 @@ class RBACService:
         self.db = db
         self.role_repo = role_repo_cls(db)
 
-    def assign_role_by_name(self, user_id: int, role_name: str) -> User:
+    def assign_role_by_name(self, user_id: int, role_name: str, tenant_id: int | None = None) -> User:
         """
-        Assigns a role to a user based on the role's name.
+        Assigns a role to a user based on the role's name, scoped to tenant.
         
         Args:
             user_id (int): The ID of the user to update.
             role_name (str): The name of the role (e.g., 'admin', 'editor').
+            tenant_id (int | None): The tenant ID to scope the role lookup.
             
         Returns:
             User: The updated User object.
@@ -45,8 +46,8 @@ class RBACService:
             HTTPException(404): If the role name does not exist.
             HTTPException(404): If the user does not exist.
         """
-        # 1. Lookup Role
-        role = self.role_repo.get_by_name(role_name)
+        # 1. Lookup Role scoped to tenant
+        role = self.role_repo.get_by_name(role_name, tenant_id=tenant_id)
         if not role:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

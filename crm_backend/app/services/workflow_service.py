@@ -47,9 +47,19 @@ class WorkflowService:
                 # If your Finance module stores product_id, use it.
                 if hasattr(item, 'product_id') and item.product_id:
                     try:
+                        # Fetch the Product object for the repo method
+                        product = self.inventory_repo.get_product(
+                            tenant_id=tenant_id,
+                            product_id=item.product_id
+                        )
+                        if not product:
+                            raise HTTPException(
+                                status_code=404, 
+                                detail=f"Product {item.product_id} not found in tenant"
+                            )
                         # Deduct stock
                         self.inventory_repo.create_transaction(
-                            product_id=item.product_id,
+                            product=product,
                             change=-(item.quantity), 
                             reason="sale",
                             ref_id=f"INV-{invoice.id}"
@@ -70,7 +80,8 @@ class WorkflowService:
                 "status": "PAID",
                 "workflow": "stock_deduction", 
                 "details": results
-            }
+            },
+            tenant_id=tenant_id
         )
         
         return {"status": "success", "operations": results}

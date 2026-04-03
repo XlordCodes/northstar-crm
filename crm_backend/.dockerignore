@@ -22,3 +22,5 @@ htmlcov/
 
 .env
 .env.example
+
+.agent/

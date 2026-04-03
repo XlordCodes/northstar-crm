@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -30,6 +30,38 @@ const COLUMNS: { id: LeadStatus; label: string }[] = [
     { id: 'converted', label: 'Converted' },
 ];
 
+const MAX_LEADS_PER_COLUMN = 50;
+
+// ── Memoized KanbanCard ──────────────────────────────────────────────────────
+interface KanbanCardProps {
+    lead: LeadOut;
+    onLeadClick: (lead: LeadOut) => void;
+    isDragging: boolean;
+}
+
+const KanbanCard = React.memo(function KanbanCard({ lead, onLeadClick, isDragging }: KanbanCardProps) {
+    return (
+        <Card
+            onClick={() => onLeadClick(lead)}
+            className={`border-none bg-white cursor-pointer transition-all duration-200 ${isDragging
+                ? 'shadow-2xl ring-1 ring-slate-200 scale-105'
+                : 'shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_15px_rgba(0,0,0,0.05)]'
+                }`}
+        >
+            <CardContent className="p-4 flex flex-col gap-1">
+                <div className="font-semibold text-sm text-slate-900 line-clamp-1">{lead.name}</div>
+                <div className="text-xs text-slate-500 line-clamp-1 truncate">
+                    {lead.email || 'No email provided'}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-2 font-medium">
+                    Added {new Date(lead.created_at).toLocaleDateString()}
+                </div>
+            </CardContent>
+        </Card>
+    );
+});
+
+// ── Main KanbanView Component ────────────────────────────────────────────────
 export function KanbanView({ leads, onLeadClick }: KanbanViewProps) {
     const queryClient = useQueryClient();
 
@@ -42,21 +74,23 @@ export function KanbanView({ leads, onLeadClick }: KanbanViewProps) {
     useEffect(() => {
         setLocalLeads(leads);
     }, [leads]);
+
     // Update Status Mutation
-    const updateStatusMutation = useMutation({
-        mutationFn: async ({ id, newStatus }: { id: number; newStatus: LeadStatus }) => {
+    const updateStatusMutation = useMutation<
+        LeadOut,
+        Error,
+        { id: number; newStatus: LeadStatus },
+        { previousLeads?: LeadOut[] }
+    >({
+        mutationFn: async ({ id, newStatus }) => {
             const payload = { status: newStatus };
             const response = await api.patch(`/leads/${id}`, payload);
             return response.data;
         },
         onMutate: async ({ id, newStatus }) => {
-            // Cancel any outgoing refetches so they don't overwrite our optimistic update
             await queryClient.cancelQueries({ queryKey: ['leads'] });
-
-            // Snapshot the previous value
             const previousLeads = queryClient.getQueryData<LeadOut[]>(['leads']);
 
-            // Optimistically update to the new value
             if (previousLeads) {
                 queryClient.setQueryData<LeadOut[]>(['leads'], (old) => {
                     if (!old) return old;
@@ -66,25 +100,26 @@ export function KanbanView({ leads, onLeadClick }: KanbanViewProps) {
                 });
             }
 
-            // Return a context object with the snapshotted value
             return { previousLeads };
         },
         onError: (_err, _newLead, context) => {
             toast.error('Failed to update lead status');
-            // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousLeads) {
                 queryClient.setQueryData(['leads'], context.previousLeads);
             }
         },
         onSettled: () => {
-            // Always refetch after error or success to ensure client syncs with server
             queryClient.invalidateQueries({ queryKey: ['leads'] });
         }
     });
 
     // Convert Deal Mutation
-    const convertDealMutation = useMutation({
-        mutationFn: async ({ id, valueCents }: { id: number; valueCents: number }) => {
+    const convertDealMutation = useMutation<
+        unknown,
+        Error,
+        { id: number; valueCents: number }
+    >({
+        mutationFn: async ({ id, valueCents }) => {
             const response = await api.post(`/leads/${id}/convert?value_cents=${valueCents}`);
             return response.data;
         },
@@ -100,33 +135,31 @@ export function KanbanView({ leads, onLeadClick }: KanbanViewProps) {
         }
     });
 
-    const handleConvertSubmit = (e: React.FormEvent) => {
+    const handleConvertSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         if (!pendingConvertLead || !dealValue) return;
 
         const valueCents = Math.round(parseFloat(dealValue) * 100);
         convertDealMutation.mutate({ id: pendingConvertLead.id, valueCents });
-    };
+    }, [pendingConvertLead, dealValue, convertDealMutation]);
 
-    const handleConvertDialogClose = (open: boolean) => {
+    const handleConvertDialogClose = useCallback((open: boolean) => {
         setIsConvertDialogOpen(open);
         if (!open) {
-            // Reset pending modal state if canceled
             setPendingConvertLead(null);
             setDealValue('');
         }
-    };
+    }, []);
 
-    const onDragEnd = (result: DropResult) => {
+    const onDragEnd = useCallback((result: DropResult) => {
         const { destination, source, draggableId } = result;
 
-        // Dropped outside or no movement
         if (!destination) return;
         if (destination.droppableId === source.droppableId) return;
 
         // User dragged to the explicitly guarded 'converted' lane
         if (destination.droppableId === 'converted') {
-            const leadToConvert = leads.find((l) => l.id.toString() === draggableId);
+            const leadToConvert = localLeads.find((l) => l.id.toString() === draggableId);
             if (leadToConvert) {
                 setPendingConvertLead(leadToConvert);
                 setIsConvertDialogOpen(true);
@@ -145,14 +178,31 @@ export function KanbanView({ leads, onLeadClick }: KanbanViewProps) {
             id: parseInt(draggableId),
             newStatus: destination.droppableId as LeadStatus,
         });
-    };
+    }, [localLeads, updateStatusMutation]);
+
+    // Memoized column leads computation
+    const columnLeadsMap = useMemo(() => {
+        const map: Record<LeadStatus, LeadOut[]> = { new: [], contacted: [], qualified: [], converted: [] };
+        for (const lead of localLeads) {
+            if (map[lead.status]) {
+                map[lead.status].push(lead);
+            }
+        }
+        // Enforce per-column cap
+        for (const key of Object.keys(map) as LeadStatus[]) {
+            if (map[key].length > MAX_LEADS_PER_COLUMN) {
+                map[key] = map[key].slice(0, MAX_LEADS_PER_COLUMN);
+            }
+        }
+        return map;
+    }, [localLeads]);
 
     return (
         <>
             <DragDropContext onDragEnd={onDragEnd}>
                 <div className="flex gap-6 h-full overflow-x-auto pb-4">
                     {COLUMNS.map((col) => {
-                        const columnLeads = localLeads.filter((l) => l.status === col.id);
+                        const columnLeads = columnLeadsMap[col.id];
                         return (
                             <Droppable key={col.id} droppableId={col.id}>
                                 {(provided, snapshot) => (
@@ -195,23 +245,11 @@ export function KanbanView({ leads, onLeadClick }: KanbanViewProps) {
                                                                         : provided.draggableProps.style?.transform,
                                                                 }}
                                                             >
-                                                                <Card
-                                                                    onClick={() => onLeadClick(lead)}
-                                                                    className={`border-none bg-white cursor-pointer transition-all duration-200 ${snapshot.isDragging
-                                                                        ? 'shadow-2xl ring-1 ring-slate-200 scale-105'
-                                                                        : 'shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_15px_rgba(0,0,0,0.05)]'
-                                                                        }`}
-                                                                >
-                                                                    <CardContent className="p-4 flex flex-col gap-1">
-                                                                        <div className="font-semibold text-sm text-slate-900 line-clamp-1">{lead.name}</div>
-                                                                        <div className="text-xs text-slate-500 line-clamp-1 truncate">
-                                                                            {lead.email || 'No email provided'}
-                                                                        </div>
-                                                                        <div className="text-[10px] text-slate-400 mt-2 font-medium">
-                                                                            Added {new Date(lead.created_at).toLocaleDateString()}
-                                                                        </div>
-                                                                    </CardContent>
-                                                                </Card>
+                                                                <KanbanCard
+                                                                    lead={lead}
+                                                                    onLeadClick={onLeadClick}
+                                                                    isDragging={snapshot.isDragging}
+                                                                />
                                                             </div>
                                                         )}
                                                     </Draggable>

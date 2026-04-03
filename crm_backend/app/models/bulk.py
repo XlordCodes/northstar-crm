@@ -48,7 +48,7 @@ class BulkMessage(Base):
     __tablename__ = "bulk_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    job_id = Column(Integer, ForeignKey("bulk_jobs.id", ondelete="CASCADE"), nullable=False)
+    job_id = Column(Integer, ForeignKey("bulk_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     
     to_number = Column(String, nullable=False, index=True)
     
@@ -72,7 +72,7 @@ class EmailQueue(Base):
     __tablename__ = "email_queue"
 
     id = Column(Integer, primary_key=True, index=True)
-    # Note: If email needs multi-tenancy later, add tenant_id here.
+    tenant_id = Column(Integer, index=True, nullable=False)
     
     to_email = Column(String, nullable=False)
     subject = Column(String, nullable=False)

@@ -1,5 +1,7 @@
 # app/authentication/router.py
 import os
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,6 +23,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/api/auth/token")
 router = APIRouter(
     tags=["Authentication"]
 )
+
+# --- RATE LIMITING ---
+
+MAX_ATTEMPTS = 5
+LOCKOUT_TIME = 300  # 5 minutes in seconds
+_failed_login_attempts: dict[str, list[float]] = defaultdict(list)
 
 # --- HELPER FUNCTIONS ---
 
@@ -87,19 +95,27 @@ class RoleChecker:
 
 @router.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    """
+    Registers a new user and provisions a SaaS workspace.
     
+    Atomic operations:
+    1. Creates a new Tenant (workspace)
+    2. Creates the User and binds them to the tenant
+    3. Assigns 'admin' role for the new workspace
+    
+    If any step fails, the entire transaction is rolled back.
+    """
     hashed_password = hashing.hash_password(user.password)
-    new_user = crud.create_user(
-        db=db, 
-        email=user.email, 
-        name=user.name, 
-        hashed_password=hashed_password
+    new_user = crud.register_workspace(
+        db=db,
+        email=user.email,
+        name=user.name,
+        hashed_password=hashed_password,
+        company_name=getattr(user, 'company_name', None)
     )
     db.commit()
-    db.refresh(new_user)
+    # Re-fetch with eager-loaded role so Pydantic's @computed_field role_name resolves
+    new_user = crud.get_user_by_email(db, email=user.email)
     return new_user
 
 
@@ -108,14 +124,36 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(database.get_db)
 ):
-    user = crud.get_user_by_email(db, email=form_data.username)
+    # --- Rate Limiting ---
+    username = form_data.username
+    now = time.time()
+    
+    # Clean expired timestamps
+    _failed_login_attempts[username] = [
+        ts for ts in _failed_login_attempts[username]
+        if now - ts < LOCKOUT_TIME
+    ]
+    
+    if len(_failed_login_attempts[username]) >= MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Please try again later.",
+        )
+    # --- End Rate Limiting ---
+
+    user = crud.get_user_by_email(db, email=username)
     if not user or not hashing.verify_password(form_data.password, user.hashed_password):
+        _failed_login_attempts[username].append(now)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Clear failed attempts on successful login
+    if username in _failed_login_attempts:
+        del _failed_login_attempts[username]
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     # This allows the middleware to extract them later for RLS context
