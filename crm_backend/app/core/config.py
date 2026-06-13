@@ -46,10 +46,10 @@ class Settings(BaseSettings):
     # SECURITY: Required token for webhook verification. No default allowed.
     WHATSAPP_VERIFY_TOKEN: str
 
-    # --- Email Integration (SendGrid) ---
+    # --- Email Integration (Resend) ---
     # Optional: If not provided, email features will be disabled or log-only.
-    SENDGRID_API_KEY: Optional[str] = None
-    DEFAULT_SENDER_EMAIL: str = "noreply@example.com"
+    RESEND_API_KEY: Optional[str] = None
+    DEFAULT_SENDER_EMAIL: str = "onboarding@resend.dev"
 
     # --- AI Services (OpenAI) ---
     # Required for RAG (Embeddings). Replaces Cohere.

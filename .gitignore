@@ -21,3 +21,10 @@ ui_ux_design.md
 opencode.json
 audit_logs.txt
 NORTHSTAR_AUDIT.md
+.cache/
+.local/
+.qodo/
+.kilo/
+.agent/
+*/.local/
+*/.cache/

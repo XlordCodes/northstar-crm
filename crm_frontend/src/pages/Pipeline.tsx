@@ -1,22 +1,34 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLeads } from '@/hooks/useLeads';
 import { useCreateLead } from '@/hooks/useCreateLead';
 import { LeadOut } from '@/types/crm';
 import { KanbanView } from '@/components/pipeline/KanbanView';
 import { ListView } from '@/components/pipeline/ListView';
 import { LeadDrawer } from '@/components/pipeline/LeadDrawer';
+import { CsvImportWizard } from '@/components/pipeline/CsvImportWizard';
 import { LayoutGrid, List, AlertCircle, Inbox, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Pipeline() {
     const [view, setView] = useState<'kanban' | 'list'>('kanban');
     const [selectedLead, setSelectedLead] = useState<LeadOut | null>(null);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-    const { data: leads, isLoading, isError } = useLeads();
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [dateFilter, setDateFilter] = useState<string>('all');
+
+    const statuses = statusFilter === 'all' ? undefined : [statusFilter];
+    const createdAfter = useMemo(() => {
+        if (dateFilter === '7days') return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        if (dateFilter === '30days') return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        return undefined;
+    }, [dateFilter]);
+
+    const { data: leads, isLoading, isError } = useLeads(0, 100, statuses, undefined, createdAfter);
     const createLead = useCreateLead();
 
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -60,6 +72,31 @@ export default function Pipeline() {
                 <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Sales Pipeline</h1>
 
                 <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="h-8 w-[130px] bg-white border-slate-200 text-slate-600 text-xs shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                                <SelectValue placeholder="All Statuses" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="contacted">Contacted</SelectItem>
+                                <SelectItem value="qualified">Qualified</SelectItem>
+                                <SelectItem value="converted">Converted</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={dateFilter} onValueChange={setDateFilter}>
+                            <SelectTrigger className="h-8 w-[120px] bg-white border-slate-200 text-slate-600 text-xs shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                                <SelectValue placeholder="Any Time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Any Time</SelectItem>
+                                <SelectItem value="7days">Last 7 Days</SelectItem>
+                                <SelectItem value="30days">Last 30 Days</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div className="flex items-center bg-white rounded-lg p-1 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-slate-100/50">
                         <Button
                             variant="ghost"
@@ -80,6 +117,7 @@ export default function Pipeline() {
                             List
                         </Button>
                     </div>
+                    <CsvImportWizard />
                     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                         <SheetTrigger asChild>
                             <Button className="bg-slate-900 text-white hover:bg-slate-800 rounded-lg shadow-none cursor-pointer">

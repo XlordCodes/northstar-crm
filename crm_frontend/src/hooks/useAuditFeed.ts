@@ -11,5 +11,6 @@ export function useAuditFeed(limit = 10) {
             });
             return response.data;
         },
+        refetchInterval: 5000,
     });
 }

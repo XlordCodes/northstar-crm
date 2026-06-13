@@ -7,7 +7,7 @@ Ensures strict typing and validation for API requests and responses.
 """
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
-from typing import Optional, Dict, Any
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 import re
@@ -125,6 +125,7 @@ class LeadUpdate(BaseModel):
     email: Optional[EmailStr] = Field(None, description="Contact email")
     phone: Optional[str] = Field(None, description="E.164 formatted phone number")
     status: Optional[LeadStatus] = Field(None, description="Update the current pipeline stage")
+    owner_id: Optional[int] = Field(None, description="Reassign lead owner")
 
     @field_validator('phone')
     @classmethod
@@ -148,6 +149,19 @@ class LeadOut(BaseModel):
     owner_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Bulk Ops Schemas ---
+
+class BulkLeadCreate(BaseModel):
+    leads: List[LeadCreate] = Field(..., min_length=1)
+
+class BulkLeadDelete(BaseModel):
+    lead_ids: List[int] = Field(..., min_length=1)
+
+class BulkLeadUpdate(BaseModel):
+    lead_ids: List[int] = Field(..., min_length=1)
+    updates: Dict[str, Any]
 
 
 # --- Deal Schemas ---

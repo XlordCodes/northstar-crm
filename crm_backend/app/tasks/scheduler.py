@@ -13,6 +13,7 @@ from app.core.celery_app import celery_app
 from app.database import SessionLocal
 from app.models.bulk import BulkJob
 from app.tasks.whatsapp_tasks import process_bulk_whatsapp_job
+from app.tasks.email_tasks import process_bulk_email_job
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,13 @@ def check_scheduled_jobs():
                 db.commit()
                 
                 # 3. Dispatch to Worker
-                process_bulk_whatsapp_job.delay(job.id)
-                logger.info(f"Scheduler: Dispatched Job {job.id} to Worker Queue")
+                channel = getattr(job, "channel", "whatsapp")
+                if channel == "email":
+                    process_bulk_email_job.delay(job.id)
+                else:
+                    process_bulk_whatsapp_job.delay(job.id)
+                    
+                logger.info(f"Scheduler: Dispatched Job {job.id} to Worker Queue ({channel})")
                 
             except Exception as inner_e:
                 logger.error(f"Scheduler: Failed to dispatch Job {job.id}: {inner_e}")

@@ -18,7 +18,7 @@ Containerization: Docker, Docker Compose
 
 Secret Mgmt: .env, python-dotenv
 
-Email: SendGrid API + Jinja2
+Email: Resend API + Jinja2
 
 LLM: OpenAI API/Cohere
 
@@ -33,7 +33,7 @@ Webhook endpoint for ingestion/idempotent storage of WhatsApp messages
 
 CRUD endpoint for Contacts (customer phonebook)
 
-Email send endpoint (Jinja2 HTML + SendGrid)
+Email send endpoint (Jinja2 HTML + Resend)
 
 LLM text reply endpoint (OpenAI/Cohere API)
 
@@ -78,7 +78,7 @@ pip install -r requirements.txt
 2. Create .env file
 text
 DATABASE_URL=postgresql://postgres:username@db:5432/crm_main
-SENDGRID_API_KEY=your_sendgrid_key
+RESEND_API_KEY=your_resend_key
 DEFAULT_SENDER_EMAIL=your@email.com
 OPENAI_API_KEY=your_openai_key
 WHATSAPP_TOKEN=your_whatsapp_token

@@ -56,10 +56,16 @@ def get_my_activity(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get the activity feed for the current user.
-    Routed through AuditService for proper layering.
+    Get the smart activity feed for the current user's tenant.
+
+    Phase 12: Returns ALL events for the logged-in user, plus only high-signal
+    events (create, convert) for other team members within the same tenant.
     """
-    return service.get_activity(
-        user_id=current_user.id, 
-        limit=limit
+    if not current_user.tenant_id:
+        return []
+
+    return service.get_smart_feed(
+        tenant_id=current_user.tenant_id,
+        current_user_id=current_user.id,
+        limit=limit,
     )

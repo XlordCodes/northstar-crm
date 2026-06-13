@@ -59,6 +59,29 @@ class AuditService:
         """
         return self.activity_repo.recent_for_user(user_id=user_id, limit=limit)
 
+    def get_smart_feed(
+        self,
+        tenant_id: int,
+        current_user_id: int,
+        limit: int = 20,
+    ) -> list[ActivityFeed]:
+        """
+        Phase 12: Smart tenant-wide activity feed.
+
+        Returns ALL events for the current user, plus only high-signal events
+        (create, convert) for other team members within the same tenant.
+
+        Args:
+            tenant_id: Tenant scope for multi-tenancy enforcement.
+            current_user_id: The logged-in user (all their events are shown).
+            limit: Maximum number of records to return.
+        """
+        return self.activity_repo.get_smart_tenant_feed(
+            tenant_id=tenant_id,
+            current_user_id=current_user_id,
+            limit=limit,
+        )
+
     def log_event(
         self, 
         actor_id: Optional[int], 
@@ -104,3 +127,30 @@ class AuditService:
             category=category
         )
         return self.activity_repo.add(feed)
+
+    def get_lead_timeline(
+        self,
+        lead_id: int,
+        tenant_id: int,
+        limit: int = 50,
+    ) -> list[AuditLog]:
+        """
+        Retrieves the audit log timeline for a specific Lead entity.
+
+        Phase 11: Provides chronological history of all actions on a lead
+        (create, update, convert) scoped by tenant isolation.
+
+        Args:
+            lead_id: The ID of the lead whose timeline is requested.
+            tenant_id: Tenant context for multi-tenancy enforcement.
+            limit: Maximum number of records to return.
+
+        Returns:
+            List of AuditLog entries for this lead, newest first.
+        """
+        return self.audit_repo.list_logs(
+            tenant_id=tenant_id,
+            entity="Lead",
+            entity_id=lead_id,
+            limit=limit,
+        )

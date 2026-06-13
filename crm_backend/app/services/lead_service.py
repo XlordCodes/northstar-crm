@@ -22,6 +22,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 # Import Event Bus Bridge
 from app.core.event_bus import event_bus, get_main_loop
+from datetime import datetime
 
 # Import Models, Schemas, and Events
 from app.schemas.crm import LeadCreate, LeadUpdate
@@ -33,6 +34,9 @@ from app.events.crm_events import DealCreated
 from app.repos.lead_repo import LeadRepo
 from app.repos.deal_repo import DealRepo
 
+# Import Audit Service (Phase 11)
+from app.services.audit_service import AuditService
+
 logger = logging.getLogger(__name__)
 
 class LeadService:
@@ -42,7 +46,7 @@ class LeadService:
     def __init__(self, db: Session):
         """
         Initialize the service with a DB session.
-        Instantiates required Repositories immediately.
+        Instantiates required Repositories and AuditService immediately.
         
         Args:
             db (Session): The active SQLAlchemy session.
@@ -50,6 +54,7 @@ class LeadService:
         self.db = db
         self.lead_repo = LeadRepo(db)
         self.deal_repo = DealRepo(db)
+        self.audit_service = AuditService(db)
 
     def create_lead(self, tenant_id: int, owner_id: int, data: LeadCreate) -> Lead:
         """
@@ -119,11 +124,68 @@ class LeadService:
         
         # All validations passed - create the lead
         lead = self.lead_repo.create(tenant_id, owner_id, data)
+
+        # Phase 11: Record audit trail for lead creation
+        self.audit_service.log_event(
+            actor_id=owner_id,
+            entity="Lead",
+            entity_id=lead.id,
+            action="create",
+            changes={"name": lead.name, "email": lead.email, "status": lead.status},
+            tenant_id=tenant_id,
+        )
+
+        # Phase 12: Post to global activity feed
+        self.audit_service.post_activity(
+            user_id=owner_id,
+            message=f"Created a new lead: {lead.name}",
+            category="create",
+        )
+
         self.db.commit()
         self.db.refresh(lead)
         return lead
 
-    def list_leads(self, tenant_id: int, limit: int = 100, skip: int = 0) -> List[Lead]:
+    def bulk_create_leads(self, tenant_id: int, owner_id: int, leads_data: List[LeadCreate]) -> int:
+        """
+        Bulk insert leads.
+        """
+        if not leads_data:
+            return 0
+            
+        new_leads = [
+            Lead(
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                name=lead.name,
+                email=lead.email,
+                phone=lead.phone,
+                status="new"
+            )
+            for lead in leads_data
+        ]
+        
+        self.db.add_all(new_leads)
+        self.db.commit()
+        
+        count = len(new_leads)
+        self.audit_service.post_activity(
+            user_id=owner_id,
+            message=f"Imported {count} new leads via CSV",
+            category="create",
+        )
+        
+        return count
+
+    def list_leads(
+        self, 
+        tenant_id: int, 
+        limit: int = 100, 
+        skip: int = 0,
+        statuses: Optional[List[str]] = None,
+        owner_id: Optional[int] = None,
+        created_after: Optional[datetime] = None
+    ) -> List[Lead]:
         """
         Retrieves a paginated list of leads for the tenant.
         
@@ -135,7 +197,14 @@ class LeadService:
         Returns:
             List[Lead]: A list of lead objects.
         """
-        return self.lead_repo.list_all(tenant_id, limit, skip)
+        return self.lead_repo.list_all(
+            tenant_id=tenant_id, 
+            limit=limit, 
+            skip=skip,
+            statuses=statuses,
+            owner_id=owner_id,
+            created_after=created_after
+        )
     
     def update_lead(self, tenant_id: int, lead_id: int, updates: dict) -> Lead:
         """
@@ -187,17 +256,101 @@ class LeadService:
                 detail="Leads cannot be manually patched to 'converted'. Use the /convert endpoint."
             )
         
-        # 3. Apply updates (only allowed fields)
+        # 3. Capture before-state for audit diff (Phase 11)
         allowed_fields = {'name', 'email', 'status'}
+        changes: dict = {}
         for key, value in updates.items():
             if key in allowed_fields:
+                old_value = getattr(lead, key)
+                if old_value != value:
+                    changes[key] = {"old": old_value, "new": value}
                 setattr(lead, key, value)
-        
+
+        # Phase 11: Record audit trail for lead update (only if fields actually changed)
+        if changes:
+            self.audit_service.log_event(
+                actor_id=lead.owner_id,
+                entity="Lead",
+                entity_id=lead_id,
+                action="update",
+                changes=changes,
+                tenant_id=tenant_id,
+            )
+
+            # Phase 12: Post to global activity feed
+            self.audit_service.post_activity(
+                user_id=lead.owner_id,
+                message=f"Updated lead: {lead.name}",
+                category="update",
+            )
+
         self.db.commit()
         self.db.refresh(lead)
         
         logger.info(f"Updated lead {lead_id} for tenant {tenant_id}")
         return lead
+        
+    def bulk_delete_leads(self, tenant_id: int, lead_ids: List[int]) -> int:
+        """
+        Deletes multiple leads for a tenant.
+        """
+        leads = self.db.query(Lead).filter(Lead.id.in_(lead_ids)).all()
+        for lead in leads:
+            if lead.tenant_id != tenant_id:
+                logger.warning(f"Bulk Delete: Tenant {tenant_id} attempted to delete lead {lead.id} from tenant {lead.tenant_id}")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more leads do not belong to the tenant.")
+        
+        deleted_count = len(leads)
+        for lead in leads:
+            self.db.delete(lead)
+        self.db.commit()
+        return deleted_count
+
+    def bulk_update_leads(self, tenant_id: int, lead_ids: List[int], updates: dict) -> List[Lead]:
+        """
+        Updates multiple leads for a tenant.
+        """
+        leads = self.db.query(Lead).filter(Lead.id.in_(lead_ids)).all()
+        
+        # Validation pass
+        for lead in leads:
+            if lead.tenant_id != tenant_id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more leads do not belong to the tenant.")
+            if lead.status == "converted":
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot modify converted lead {lead.id}.")
+                
+        if updates.get("status") == "converted":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot bulk update to converted.")
+
+        allowed_fields = {'name', 'email', 'status', 'owner_id', 'phone'}
+        for lead in leads:
+            changes = {}
+            for key, value in updates.items():
+                if key in allowed_fields and value is not None:
+                    old_value = getattr(lead, key)
+                    if old_value != value:
+                        changes[key] = {"old": old_value, "new": value}
+                    setattr(lead, key, value)
+            
+            if changes:
+                self.audit_service.log_event(
+                    actor_id=lead.owner_id,
+                    entity="Lead",
+                    entity_id=lead.id,
+                    action="update",
+                    changes=changes,
+                    tenant_id=tenant_id,
+                )
+                self.audit_service.post_activity(
+                    user_id=lead.owner_id,
+                    message=f"Updated lead in bulk: {lead.name}",
+                    category="update",
+                )
+
+        self.db.commit()
+        for lead in leads:
+            self.db.refresh(lead)
+        return leads
 
     def promote_to_deal(
         self, 

@@ -49,10 +49,12 @@ class AuditLogOut(BaseModel):
 class ActivityFeedOut(BaseModel):
     """
     Response model for the user's activity timeline.
-    Human-readable messages.
+    Human-readable messages with actor context.
     """
     id: int
     message: str = Field(..., description="Human readable activity description")
+    category: Optional[str] = Field(default="general", description="Activity category (create, update, convert)")
+    user: Optional[AuditActor] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

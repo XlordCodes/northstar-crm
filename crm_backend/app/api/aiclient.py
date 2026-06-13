@@ -37,7 +37,7 @@ def generate_text(
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful CRM assistant."},
                 {"role": "user", "content": request.prompt}

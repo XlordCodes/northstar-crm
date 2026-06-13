@@ -10,6 +10,7 @@ Enforces tenant isolation on all queries.
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from datetime import datetime
 
 from app.models.crm import Lead
 from app.schemas.crm import LeadCreate
@@ -43,13 +44,29 @@ class LeadRepo:
             Lead.tenant_id == tenant_id
         ).first()
 
-    def list_all(self, tenant_id: int, limit: int = 100, skip: int = 0) -> List[Lead]:
+    def list_all(
+        self, 
+        tenant_id: int, 
+        limit: int = 100, 
+        skip: int = 0,
+        statuses: Optional[List[str]] = None,
+        owner_id: Optional[int] = None,
+        created_after: Optional[datetime] = None
+    ) -> List[Lead]:
         """
         Lists leads for a tenant, ordered by newest first.
         """
+        query = self.db.query(Lead).filter(Lead.tenant_id == tenant_id)
+        
+        if statuses:
+            query = query.filter(Lead.status.in_(statuses))
+        if owner_id is not None:
+            query = query.filter(Lead.owner_id == owner_id)
+        if created_after:
+            query = query.filter(Lead.created_at >= created_after)
+
         return (
-            self.db.query(Lead)
-            .filter(Lead.tenant_id == tenant_id)
+            query
             .order_by(desc(Lead.created_at))
             .offset(skip)
             .limit(limit)

@@ -8,8 +8,8 @@ Strictly enforcing read/write patterns (Audits are typically append-only).
 """
 
 from typing import List, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.orm import Session, contains_eager
+from sqlalchemy import desc, or_
 
 from app.models.audit import AuditLog, ActivityFeed
 from app.models.auth import User
@@ -108,6 +108,45 @@ class ActivityRepo:
         return (
             self.db.query(ActivityFeed)
             .filter(ActivityFeed.user_id == user_id)
+            .order_by(desc(ActivityFeed.created_at))
+            .limit(limit)
+            .all()
+        )
+
+    def get_smart_tenant_feed(
+        self,
+        tenant_id: int,
+        current_user_id: int,
+        limit: int = 20,
+    ) -> List[ActivityFeed]:
+        """
+        Smart tenant-wide activity feed.
+
+        Phase 12: Returns ALL events for the current user, but only high-signal
+        events (create, convert) for other team members in the same tenant.
+
+        Uses a JOIN on User to enforce tenant isolation, and contains_eager
+        to populate the ActivityFeed.user relationship without a duplicate join.
+
+        Args:
+            tenant_id: Tenant scope for multi-tenancy enforcement.
+            current_user_id: The logged-in user (all their events are included).
+            limit: Maximum number of records to return.
+
+        Returns:
+            List of ActivityFeed entries, newest first.
+        """
+        return (
+            self.db.query(ActivityFeed)
+            .join(User, ActivityFeed.user_id == User.id)
+            .options(contains_eager(ActivityFeed.user))
+            .filter(
+                User.tenant_id == tenant_id,
+                or_(
+                    ActivityFeed.user_id == current_user_id,
+                    ActivityFeed.category.in_(["create", "convert"]),
+                ),
+            )
             .order_by(desc(ActivityFeed.created_at))
             .limit(limit)
             .all()

@@ -3,89 +3,95 @@
 Module: Sentiment Analysis Service
 Context: Pod C - Module 5 (AI Sentiment).
 
-Uses a local Transformer model (Hugging Face) to tag incoming messages.
-Implements 'Lazy Loading' to prevent high memory usage during app startup.
+Analyzes incoming chat message sentiment using OpenAI GPT.
+Replaces the previous local HuggingFace Transformer model
+to eliminate the ~2GB torch/transformers dependency footprint.
 """
 
 import logging
 from sqlalchemy.orm import Session
-from app.models import ChatMessage
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from openai import OpenAI, APIConnectionError, RateLimitError
 
-# We import pipeline here, but we DON'T initialize it yet.
-try:
-    from transformers import pipeline
-except ImportError:
-    pipeline = None
+from app.models import ChatMessage
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Global singleton to hold the model in memory *after* first load
-_sentiment_pipeline = None
-
-def get_pipeline():
-    """
-    Lazy loader for the sentiment model.
-    Only loads the 500MB+ model into RAM when actually needed.
-    """
-    global _sentiment_pipeline
-    
-    if _sentiment_pipeline is not None:
-        return _sentiment_pipeline
-
-    if pipeline is None:
-        logger.error("Transformers library not installed.")
-        return None
-
-    try:
-        logger.info("⏳ Loading Sentiment Model (this may take a moment)...")
-        # 'distilbert-base-uncased-finetuned-sst-2-english' is fast and lightweight
-        _sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
-        logger.info("✅ Sentiment Model Loaded.")
-        return _sentiment_pipeline
-    except Exception as e:
-        logger.error(f"Failed to load sentiment model: {e}")
-        return None
 
 class SentimentService:
     def __init__(self, db: Session):
         self.db = db
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((APIConnectionError, RateLimitError))
+    )
+    def _classify_sentiment(self, text: str) -> str:
+        """
+        Calls OpenAI to classify sentiment as POSITIVE, NEGATIVE, or NEUTRAL.
+        """
+        if not self.client:
+            logger.error("OPENAI_API_KEY is not configured.")
+            return "neutral"
+
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a sentiment classifier. "
+                        "Analyze the sentiment of the user's text. "
+                        "Reply with exactly one word: POSITIVE, NEGATIVE, or NEUTRAL."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            temperature=0.0,
+            max_tokens=5
+        )
+
+        raw = response.choices[0].message.content.strip().lower()
+
+        # Normalize to known labels
+        if raw in ("positive", "negative", "neutral"):
+            return raw
+        return "neutral"
 
     def analyze_and_store(self, message_id: int) -> str:
         """
         Analyzes the sentiment of a stored message and updates its record.
         """
-        # 1. Fetch Pipeline (Lazy Load)
-        analyzer = get_pipeline()
-        
-        if not analyzer:
-            logger.warning("Sentiment analysis skipped: Model unavailable.")
-            return "service_unavailable"
-
-        # 2. Fetch Message
+        # 1. Fetch Message
         message = self.db.get(ChatMessage, message_id)
         if not message:
             logger.error(f"Message ID {message_id} not found.")
             return "error"
 
-        # 3. Validation
+        # 2. Validation
         if not message.text or not message.text.strip():
             return "neutral"
 
-        # 4. Inference
+        # 3. Inference via OpenAI
         try:
-            # Truncate to 512 chars (approx) to respect model token limits safely
+            # Truncate to 512 chars to limit token cost
             text_sample = message.text[:512]
-            
-            result = analyzer(text_sample)[0]
-            label = result["label"].lower() # e.g., 'positive', 'negative'
-            
-            # 5. Save Result
+            label = self._classify_sentiment(text_sample)
+
+            # 4. Save Result
             message.sentiment = label
             self.db.commit()
             self.db.refresh(message)
-            
+
             return label
-            
+
         except Exception as e:
-            logger.error(f"Inference failed for Msg {message_id}: {e}")
-            return "error"
+            logger.error(f"Sentiment analysis failed for Msg {message_id}: {e}")
+            # Graceful fallback — never crash the Celery task
+            return "neutral"

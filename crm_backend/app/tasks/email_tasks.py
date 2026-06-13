@@ -4,14 +4,15 @@ Module: Email Background Tasks
 Context: Pod C - Async Notifications
 
 Processes the Email Queue.
-Decouples the API (fast response) from the SMTP/SendGrid layer (slow/flaky).
+Decouples the API (fast response) from the SMTP/Resend layer (slow/flaky).
 """
 
 import logging
 from app.core.celery_app import celery_app
 from app.database import SessionLocal
-from app.models.bulk import EmailQueue
+from app.models.bulk import EmailQueue, BulkJob, BulkMessage
 from app.services.email_service import Emailer
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def send_email_task(self, email_job_id: int):
             return
 
         # 2. Initialize Service
-        # The Emailer handles the SendGrid connection and template rendering
+        # The Emailer handles the Resend connection and template rendering
         emailer = Emailer()
         
         # 3. Attempt Delivery
@@ -76,5 +77,85 @@ def send_email_task(self, email_job_id: int):
         # Catch-all for DB errors or other critical failures
         logger.critical(f"Email Task Critical Error: {e}")
         # We don't retry DB connection errors indefinitely to avoid hammering the DB
+    finally:
+        db.close()
+
+
+@celery_app.task(name="process_bulk_email_job", bind=True, max_retries=1)
+def process_bulk_email_job(self, job_id: int):
+    """
+    Celery task to execute a Bulk Email Job using BulkMessage rows.
+    """
+    db = SessionLocal()
+    try:
+        logger.info(f"Worker: Starting Bulk Email Job {job_id}")
+        
+        job = db.get(BulkJob, job_id)
+        if not job:
+            logger.error(f"Worker: Email Job {job_id} not found in DB.")
+            return "Job Not Found"
+            
+        job.status = "running"
+        db.commit()
+        
+        emailer = Emailer()
+        
+        while True:
+            msgs = (
+                db.query(BulkMessage)
+                .filter(BulkMessage.job_id == job_id, BulkMessage.status == "pending")
+                .limit(50)
+                .all()
+            )
+            
+            if not msgs:
+                break
+                
+            for m in msgs:
+                try:
+                    subject = job.email_subject or "Broadcast Message"
+                    
+                    context = {}
+                    if job.email_body:
+                        context["body"] = job.email_body
+                        
+                    template_name = "custom" if job.email_body else job.template_name
+                    
+                    emailer.send_mail(
+                        to_email=m.to_number,
+                        subject=subject,
+                        template_name=template_name,
+                        context=context
+                    )
+                    m.status = "sent"
+                except Exception as inner_e:
+                    logger.warning(f"Job {job_id}: Failed to send email to {m.to_number}. Error: {inner_e}")
+                    m.attempts += 1
+                    m.status = "failed"
+                    m.last_error = str(inner_e)
+                    
+            try:
+                db.commit()
+                time.sleep(1)
+            except Exception as db_err:
+                logger.error(f"Job {job_id}: DB Commit failed for email batch: {db_err}")
+                db.rollback()
+                break
+                
+        job.status = "completed"
+        db.commit()
+        logger.info(f"Worker: Bulk Email Job {job_id} finished")
+        return f"Completed: {job.status}"
+        
+    except Exception as e:
+        logger.critical(f"Worker: Bulk Email Job {job_id} CRASHED. Error: {e}")
+        try:
+            job = db.get(BulkJob, job_id)
+            if job:
+                job.status = "failed"
+                db.commit()
+        except:
+            pass
+        raise self.retry(exc=e, countdown=60)
     finally:
         db.close()

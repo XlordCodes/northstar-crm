@@ -309,14 +309,27 @@ async def whatsapp_webhook(
     # ========================================================================
     chat_svc = ChatService(db)
     status_svc = StatusService(db)
-    webhook_tenant_id = settings.DEFAULT_TENANT_ID
-    
     # ========================================================================
     # STEP 5: PROCESS VALIDATED ENTRIES
     # ========================================================================
+    from app.models.tenant import Tenant
+
     for entry in validated_payload.entry:
         for change in entry.changes:
             val = change.value
+            
+            # --- BYON: Multi-Tenant Webhook Routing ---
+            phone_number_id = val.metadata.get("phone_number_id") if val.metadata else None
+            if not phone_number_id:
+                logger.warning("No phone_number_id found in webhook metadata. Skipping.")
+                continue
+                
+            tenant = db.query(Tenant).filter(Tenant.wa_phone_number_id == phone_number_id).first()
+            if not tenant:
+                logger.warning(f"Unlinked phone number ID {phone_number_id}. Ignoring webhook.")
+                continue
+                
+            webhook_tenant_id = tenant.id
             
             # --- A. Handle Incoming Messages (User -> Bot) ---
             if val.messages:

@@ -13,6 +13,7 @@ from app.core.celery_app import celery_app
 from app.database import SessionLocal
 from app.models.bulk import BulkMessage
 from app.integrations.whatsapp_client import whatsapp_client
+from app.services.email_service import Emailer
 
 logger = logging.getLogger(__name__)
 
@@ -53,27 +54,36 @@ def retry_failed_bulk_messages():
                 continue
 
             try:
-                # 2. Attempt Resend
-                # We interpret the existing error as transient and try again.
+                # 2. Attempt Resend — route by channel
                 logger.info(f"Retrying Message {msg.id} to {msg.to_number} (Attempt {msg.attempts + 1})")
                 
-                # Using the Sync client (safe for Celery)
-                response = whatsapp_client.send_template_sync(
-                    to_number=msg.to_number,
-                    template_name=job.template_name,
-                    language=job.language_code,
-                    components=job.components
-                )
+                channel = getattr(job, "channel", "whatsapp") or "whatsapp"
+                
+                if channel == "email":
+                    emailer = Emailer()
+                    subject = job.email_subject or "Broadcast Message"
+                    context = {"body": job.email_body} if job.email_body else {}
+                    template_name = "custom" if job.email_body else job.template_name
+                    emailer.send_mail(
+                        to_email=msg.to_number,
+                        subject=subject,
+                        template_name=template_name,
+                        context=context
+                    )
+                else:
+                    response = whatsapp_client.send_template_sync(
+                        to_number=msg.to_number,
+                        template_name=job.template_name,
+                        language=job.language_code,
+                        components=job.components
+                    )
+                    # Extract the new WAMID from the response if available
+                    if response and "messages" in response:
+                        msg.whatsapp_message_id = response["messages"][0].get("id")
                 
                 # 3. Success Path
                 msg.status = "sent"
-                
-                # Extract the new WAMID from the response if available
-                # Response format: {'messages': [{'id': 'wamid.HBg...'}]}
-                if response and "messages" in response:
-                     msg.whatsapp_message_id = response["messages"][0].get("id")
-
-                msg.last_error = None # Clear error
+                msg.last_error = None
                 msg.attempts += 1
                 success_count += 1
                 

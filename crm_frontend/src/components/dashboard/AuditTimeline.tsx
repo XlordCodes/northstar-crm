@@ -21,6 +21,9 @@ export function AuditTimeline() {
                                 <p className="text-[13px] text-zinc-800 leading-snug">{item.message}</p>
                                 <span className="text-[11px] text-zinc-500 font-medium tracking-tight">
                                     {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                                    {item.user?.email && (
+                                        <span className="text-zinc-400"> · {item.user.email}</span>
+                                    )}
                                 </span>
                             </div>
                         ))}

@@ -26,6 +26,7 @@ from app.database import Base, engine
 # --- EVENT BUS IMPORTS (Module 7) ---
 from app.core.event_bus import event_bus, set_main_loop
 from app.subscribers.inventory_subscribers import setup_inventory_subscribers
+from app.subscribers.crm_subscribers import setup_crm_subscribers
 
 # --- ROUTER IMPORTS ---
 # Importing this ensures all Models are loaded into Base.metadata via side-effects
@@ -69,6 +70,7 @@ async def lifespan(app: FastAPI):
 
     # 3. Initialize Event Bus Subscribers
     setup_inventory_subscribers(event_bus)
+    setup_crm_subscribers(event_bus)
     logger.info("📡 Event Bus: Subscribers registered.")
 
     yield
@@ -91,11 +93,10 @@ origins = settings.BACKEND_CORS_ORIGINS
 if not origins:
     logger.warning(
         "⚠️ SECURITY WARNING: BACKEND_CORS_ORIGINS is empty. "
-        "No cross-origin requests will be allowed. "
-        "Set BACKEND_CORS_ORIGINS in .env to whitelist specific domains."
+        "Adding development origin http://localhost:5173 for local development."
     )
-    # Fail-closed: Empty list means no origins are allowed
-    origins = []
+    # Add Vite development server origin for local development
+    origins = ["http://localhost:5173"]
 elif "*" in origins:
     logger.error(
         "❌ SECURITY ERROR: Wildcard '*' detected in BACKEND_CORS_ORIGINS. "

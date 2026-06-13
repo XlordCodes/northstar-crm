@@ -25,6 +25,11 @@ class BulkJob(Base):
     template_name = Column(String, nullable=False)
     language_code = Column(String, default="en_US")
     
+    # Marketing Channel
+    channel = Column(String, default="whatsapp", index=True)
+    email_subject = Column(String, nullable=True)
+    email_body = Column(Text, nullable=True)
+    
     # Status: 'queued', 'scheduled', 'running', 'completed', 'failed'
     status = Column(String, default="queued", index=True)
     

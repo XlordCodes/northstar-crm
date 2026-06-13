@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Digital Gallery CRM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#2f3131",
+                        "on-primary-fixed": "#001a42",
+                        "outline-variant": "#c2c6d6",
+                        "tertiary-fixed-dim": "#c4c6ce",
+                        "secondary-fixed": "#e2e2e7",
+                        "primary-container": "#2270e4",
+                        "outline": "#727785",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#181c21",
+                        "on-secondary-fixed-variant": "#45474b",
+                        "surface-tint": "#005ac3",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#1a1c1c",
+                        "inverse-primary": "#aec6ff",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#fefcff",
+                        "error": "#ba1a1a",
+                        "background": "#f9f9f9",
+                        "surface-variant": "#e2e2e2",
+                        "on-secondary-container": "#616267",
+                        "tertiary-container": "#72747c",
+                        "primary-fixed": "#d8e2ff",
+                        "on-tertiary-fixed-variant": "#44474d",
+                        "surface-container-high": "#e8e8e8",
+                        "surface": "#f9f9f9",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#f0f1f1",
+                        "surface-dim": "#dadada",
+                        "secondary-fixed-dim": "#c6c6cb",
+                        "on-error-container": "#93000a",
+                        "primary": "#0058be",
+                        "on-surface-variant": "#424754",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#dfdfe5",
+                        "tertiary-fixed": "#e0e2ea",
+                        "primary-fixed-dim": "#aec6ff",
+                        "surface-bright": "#f9f9f9",
+                        "surface-container": "#eeeeee",
+                        "surface-container-low": "#f3f3f3",
+                        "on-background": "#1a1c1c",
+                        "secondary": "#5d5e63",
+                        "on-secondary-fixed": "#1a1c20",
+                        "on-primary-container": "#fefcff",
+                        "tertiary": "#595c63",
+                        "on-primary-fixed-variant": "#004395"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9f9f9;
+            color: #1a1c1c;
+        }
+        .glass-panel {
+            background: rgba(249, 249, 249, 0.9);
+            backdrop-filter: blur(20px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- NavigationDrawer -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-8 w-64 bg-zinc-50 border-r border-zinc-100 z-50">
+<div class="px-8 mb-12">
+<h1 class="text-blue-700 font-black text-xl tracking-tighter uppercase">Digital Gallery</h1>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-8 py-3 text-blue-700 border-r-2 border-blue-700 bg-white group transition-opacity opacity-100" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="dashboard">dashboard</span>
+<span class="font-sans text-xs uppercase tracking-[0.05em] font-bold">Dashboard</span>
+</a>
+<a class="flex items-center px-8 py-3 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-opacity opacity-80 hover:opacity-100" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="group">group</span>
+<span class="font-sans text-xs uppercase tracking-[0.05em] font-bold">Contacts</span>
+</a>
+<a class="flex items-center px-8 py-3 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-opacity opacity-80 hover:opacity-100" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="account_tree">account_tree</span>
+<span class="font-sans text-xs uppercase tracking-[0.05em] font-bold">Pipeline</span>
+</a>
+<a class="flex items-center px-8 py-3 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-opacity opacity-80 hover:opacity-100" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="payments">payments</span>
+<span class="font-sans text-xs uppercase tracking-[0.05em] font-bold">Finance</span>
+</a>
+<a class="flex items-center px-8 py-3 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-opacity opacity-80 hover:opacity-100" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="inventory_2">inventory_2</span>
+<span class="font-sans text-xs uppercase tracking-[0.05em] font-bold">Inventory</span>
+</a>
+<a class="flex items-center px-8 py-3 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-opacity opacity-80 hover:opacity-100" href="#">
+<span class="material-symbols-outlined mr-4" data-icon="inbox">inbox</span>
+<span class="font-sans text-xs uppercase tracking-[0.05em] font-bold">Inbox</span>
+</a>
+</nav>
+<div class="px-8 mt-auto pt-8 border-t border-zinc-100/50">
+<div class="flex items-center gap-3">
+<img alt="User Profile" class="w-8 h-8 rounded-full grayscale" data-alt="professional portrait of a man with short hair in a minimalist studio setting with clean white lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUH3UG8-cP1QcEZJTjdnw5DGSFJjSsRxofmRDBiYhTlX-5laast8Nup-6NTc2Alyg__WuZ_ljwmz0oCiE2UPCmSQlaJKY5Tm7o_vwn_V5cAJuwhIuJ3x_4oDr5WCPxarikvwlrLOWYKcCZpxpSZg1qtKbySukbCac4cqIufzaXmm2_v_baEsA0kphr9XgdFY07AVc6QqXsuxNp37wiahZHbh9nnA6W02qtBd_yJslf8a9ZZSAEGRPsWyAT2g2lWbRz58tWmL638A"/>
+<div>
+<p class="text-[10px] font-bold text-zinc-900 uppercase tracking-widest">Alex Rivera</p>
+<p class="text-[9px] text-zinc-400">Admin Account</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-40 flex items-center justify-between px-10 h-16 w-full bg-white border-b border-zinc-100">
+<div class="flex items-center flex-1 max-w-xl">
+<span class="material-symbols-outlined text-zinc-400 mr-3" data-icon="search">search</span>
+<input class="w-full bg-transparent border-none focus:ring-0 text-sm font-sans antialiased tracking-tight placeholder:text-zinc-400" placeholder="Search records, pipeline or contacts..." type="text"/>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-zinc-400 hover:text-blue-700 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="h-8 w-[1px] bg-zinc-100"></div>
+<button class="flex items-center gap-2 group">
+<span class="text-sm font-medium text-zinc-900 tracking-tight">CRM Explorer</span>
+<img alt="User Avatar" class="w-8 h-8 rounded-full border border-zinc-100 group-hover:border-blue-700 transition-colors" data-alt="close up headshot of a woman with minimalist jewelry in soft morning light looking directly at camera" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvUtjvguDSbJAAT1kP54nySsPZ4cKBQZFrrL7ZAZONZMrr_gddpzXsEmtLr0n-lcZXfOhhsXKrDeq2ySkUhJayKYLiO4X88JBZP_moJeM7FjObvWQv1b6PJieCOZHMpQfi-CSkDuLrRm1pSdy5t_JLS5Ewe5R_uxOrciKPED0ZhI5SLzYtDp8Isq1BeuetaexsPyiZ2TG7KZkZ4JMTSI6XM6HT4nhdpO89_8UML11IHD4MwWRazdFK8AnT8nCd2WX18YaB525o7w"/>
+</button>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-10 flex-1 overflow-y-auto bg-surface">
+<!-- Breadcrumbs & Actions -->
+<div class="flex justify-between items-end mb-12">
+<div>
+<p class="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-2">Workspace / Active Pipeline</p>
+<h2 class="text-4xl font-extrabold text-on-surface tracking-tighter">Deal Records</h2>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 bg-surface-container-high text-on-surface text-xs font-bold uppercase tracking-widest hover:bg-surface-container-highest transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="filter_list">filter_list</span>
+                        Filter
+                    </button>
+<button class="px-6 py-2.5 bg-primary text-on-primary text-xs font-bold uppercase tracking-widest hover:bg-primary-container transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="add">add</span>
+                        New Record
+                    </button>
+</div>
+</div>
+<!-- Bento Stats Grid -->
+<div class="grid grid-cols-4 gap-6 mb-12">
+<div class="bg-surface-container-lowest p-6 flex flex-col justify-between h-32 border-l-2 border-primary">
+<span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total Pipeline</span>
+<span class="text-3xl font-black text-on-surface tracking-tighter">$2.4M</span>
+</div>
+<div class="bg-surface-container-lowest p-6 flex flex-col justify-between h-32 border-l-2 border-zinc-200">
+<span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Active Deals</span>
+<span class="text-3xl font-black text-on-surface tracking-tighter">48</span>
+</div>
+<div class="bg-surface-container-lowest p-6 flex flex-col justify-between h-32 border-l-2 border-zinc-200">
+<span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Conversion</span>
+<span class="text-3xl font-black text-on-surface tracking-tighter">14.2%</span>
+</div>
+<div class="bg-surface-container-lowest p-6 flex flex-col justify-between h-32 border-l-2 border-zinc-200">
+<span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Win Rate</span>
+<span class="text-3xl font-black text-on-surface tracking-tighter">68%</span>
+</div>
+</div>
+<!-- Flat Table -->
+<div class="bg-surface-container-lowest overflow-hidden">
+<div class="min-w-full">
+<!-- Header -->
+<div class="grid grid-cols-6 bg-surface-container-low px-8 py-4">
+<div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Company / Client</div>
+<div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Value</div>
+<div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Status</div>
+<div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Owner</div>
+<div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Last Activity</div>
+<div class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Action</div>
+</div>
+<!-- Rows -->
+<div class="divide-y divide-zinc-50">
+<!-- Row 1 -->
+<div class="grid grid-cols-6 px-8 py-6 items-center hover:bg-zinc-50 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-zinc-100 flex items-center justify-center font-bold text-[10px] text-zinc-400">AC</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">Acme Corp</p>
+<p class="text-[10px] text-zinc-400 tracking-tight">Enterprise Suite Upgrade</p>
+</div>
+</div>
+<div class="text-sm font-medium text-on-surface">$120,000</div>
+<div>
+<span class="px-2 py-1 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase tracking-wider">Negotiation</span>
+</div>
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full grayscale" data-alt="portrait of man in neutral grey lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJd6xQLAY1vtx-3vd-oOiOjP2mPSOR8xXIzSYhxSe8z309o_bo7EWK_Y5T-bsz2AF4qWn0D2yCqIP3YF8lL1U9sI_QhyDbfO2cKzGXqgWOZ8WaJsx8r8u_2TOkmsKj1nSjtnqE1ne2NxD7jIfE4aZ0VpXRGdrqJ-74u3jsbn-W3SdidsTm_ouydHGAMezKmmMHTYs1XuQkgIjYV9bMyRJRnGGHuvZZBjtVOflyrJiTDJczBdO9flk3VSMKvIeMQpj1_hrLhhYgUA"/>
+<span class="text-[10px] font-medium text-zinc-600">Sarah K.</span>
+</div>
+<div class="text-[10px] text-zinc-400">2 hours ago</div>
+<div class="text-right">
+<button class="text-zinc-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="grid grid-cols-6 px-8 py-6 items-center hover:bg-zinc-50 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-zinc-100 flex items-center justify-center font-bold text-[10px] text-zinc-400">NL</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">NextLevel Inc</p>
+<p class="text-[10px] text-zinc-400 tracking-tight">Q4 Logistics Support</p>
+</div>
+</div>
+<div class="text-sm font-medium text-on-surface">$45,500</div>
+<div>
+<span class="px-2 py-1 bg-zinc-100 text-zinc-500 text-[9px] font-bold uppercase tracking-wider">Qualified</span>
+</div>
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full grayscale" data-alt="portrait of smiling woman in soft light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9-qAgDDx2WTlkRG9SDxMvAbGv_5vQ6RALgwEo2pVfjqh7Au9zZA8RuZhXYHiEEEiIOeT6sME_SuP-9KBXnStU8DfFiKWg7QTFtpDFtNNpbfRkpYe75HBy9kmyM29AMA4mbrDiYiJgJTJTrhfurNwBMD7ycA52MfJG175OvxAPiuG5as2OhYegXyLfUuMqLgpmFOq8xghYJF5Pp7um72VlliomUx_o0MqpMFAbTLVtEs-gdlRjtBuepqylVYb4YmURZUlenMBWNw"/>
+<span class="text-[10px] font-medium text-zinc-600">Mark V.</span>
+</div>
+<div class="text-[10px] text-zinc-400">Yesterday</div>
+<div class="text-right">
+<button class="text-zinc-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="grid grid-cols-6 px-8 py-6 items-center hover:bg-zinc-50 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-zinc-100 flex items-center justify-center font-bold text-[10px] text-zinc-400">GT</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">Global Tech</p>
+<p class="text-[10px] text-zinc-400 tracking-tight">API Integration Project</p>
+</div>
+</div>
+<div class="text-sm font-medium text-on-surface">$280,000</div>
+<div>
+<span class="px-2 py-1 bg-green-50 text-green-700 text-[9px] font-bold uppercase tracking-wider">Proposal Sent</span>
+</div>
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full grayscale" data-alt="portrait of man in blue shirt with natural light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDm7GijduoYl1bkenpeePmaQA1J7AI8eQ2hByw4oiWjPqNAoZoZNKf2FLt4GM9OoXUzgfR1CiNY_5X8EukvdrYQCWL16HZy4bWB0E3BU9teRS8hFgYbpO8D-ODLlJUTxL3R79zR3zt4L58ptUzrYvmC1S9AmnGfRluqU8bHsNG6GBFx0F6eU7xSYlPKKCpJHiKDjk2ltalDH34GJZWikd1BAH_OgwRicw6LTXmNv4sGq6cHXA8HL42NzL7Zg8w6use3p6PIdpMy2A"/>
+<span class="text-[10px] font-medium text-zinc-600">Sarah K.</span>
+</div>
+<div class="text-[10px] text-zinc-400">3 days ago</div>
+<div class="text-right">
+<button class="text-zinc-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Slide-out Panel (Sheet) - Data Entry Form -->
+<!-- Managed via hidden/flex toggle normally, shown for display -->
+<div class="fixed inset-0 bg-zinc-900/20 backdrop-blur-sm z-[60] flex justify-end">
+<div class="w-[500px] h-full glass-panel border-l border-zinc-200 p-12 flex flex-col">
+<div class="flex justify-between items-center mb-16">
+<h3 class="text-2xl font-black text-on-surface tracking-tighter uppercase">New Record</h3>
+<button class="text-zinc-400 hover:text-on-surface">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<form class="space-y-10 flex-1 overflow-y-auto no-scrollbar pr-4">
+<div>
+<label class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-4">Company Name</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all px-0 py-3 text-sm font-medium" placeholder="e.g. Acme Corp" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-8">
+<div>
+<label class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-4">Deal Value</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all px-0 py-3 text-sm font-medium" placeholder="$ 0.00" type="text"/>
+</div>
+<div>
+<label class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-4">Pipeline Stage</label>
+<select class="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all px-0 py-3 text-sm font-medium">
+<option>Qualified</option>
+<option>Discovery</option>
+<option>Proposal</option>
+<option>Negotiation</option>
+</select>
+</div>
+</div>
+<div>
+<label class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-4">Primary Contact</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all px-0 py-3 text-sm font-medium" placeholder="client@company.com" type="email"/>
+<span class="absolute right-0 top-1/2 -translate-y-1/2 material-symbols-outlined text-zinc-300" data-icon="alternate_email">alternate_email</span>
+</div>
+</div>
+<div>
+<label class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-4">Project Brief</label>
+<textarea class="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 transition-all px-0 py-3 text-sm font-medium resize-none" placeholder="Describe the scope of the deal..." rows="4"></textarea>
+</div>
+<div class="pt-8">
+<button class="w-full py-4 bg-primary text-on-primary text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary-container transition-all" type="submit">
+                        Create Record
+                    </button>
+<button class="w-full py-4 mt-4 text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] hover:text-zinc-900 transition-all" type="button">
+                        Save as Draft
+                    </button>
+</div>
+</form>
+<div class="mt-auto pt-8 border-t border-zinc-100">
+<p class="text-[9px] text-zinc-400 italic">Auto-saving to cloud...</p>
+</div>
+</div>
+</div>
+</body></html>

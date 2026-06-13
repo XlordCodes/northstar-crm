@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DASHBOARD_KPI_QUERY_KEY } from './useDashboardKPIs';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -75,6 +76,8 @@ export function useCreateContact() {
 
         onSuccess: () => {
             toast.success('Contact created');
+            // Invalidate dashboard KPIs to reflect new contact count
+            queryClient.invalidateQueries({ queryKey: DASHBOARD_KPI_QUERY_KEY });
         },
 
         onSettled: () => {

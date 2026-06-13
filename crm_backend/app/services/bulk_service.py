@@ -32,35 +32,30 @@ class BulkService:
     def create_job(
         self, 
         tenant_id: int, 
+        channel: str,
         template_name: str, 
         language_code: str, 
         components: Optional[List[dict]], 
         numbers: List[str],
+        emails: List[str],
+        email_subject: Optional[str] = None,
+        email_body: Optional[str] = None,
         scheduled_at: Optional[datetime] = None,
         status: str = "queued"
     ) -> BulkJob:
         """
         Creates a new bulk job and queues messages using high-performance Batch Insert.
-        
-        Args:
-            tenant_id (int): Security context.
-            template_name (str): WhatsApp template ID.
-            language_code (str): e.g., 'en_US'.
-            components (list): Dynamic parameters for the template.
-            numbers (list): List of destination phone numbers.
-            scheduled_at (datetime): Optional execution time.
-            status (str): Initial status ('queued' or 'scheduled').
-            
-        Returns:
-            BulkJob: The created job instance.
         """
         try:
             # 1. Create the Job Parent
             job = BulkJob(
                 tenant_id=tenant_id,
+                channel=channel,
                 template_name=template_name,
                 language_code=language_code,
                 components=components,
+                email_subject=email_subject,
+                email_body=email_body,
                 status=status,              
                 scheduled_at=scheduled_at   
             )
@@ -68,15 +63,14 @@ class BulkService:
             self.db.flush() # Flush to generate the job.id required for child messages
 
             # 2. Performance Optimization: Bulk Insert
-            # Mapping objects in memory is fast; DB round-trips are slow.
-            # We construct all Message objects and save them in a single SQL operation.
+            targets = numbers if channel == "whatsapp" else emails
             bulk_messages = [
                 BulkMessage(
                     job_id=job.id, 
-                    to_number=num, 
+                    to_number=target,  # For emails, this holds the email address
                     status="pending"
                 ) 
-                for num in numbers
+                for target in targets
             ]
             
             # This is ~100x faster than a loop for large lists
@@ -87,7 +81,7 @@ class BulkService:
             self.db.commit()
             self.db.refresh(job)
             
-            logger.info(f"Created Bulk Job {job.id} with {len(numbers)} messages (Status: {status})")
+            logger.info(f"Created Bulk Job {job.id} with {len(targets)} messages (Status: {status})")
             return job
 
         except SQLAlchemyError as e:

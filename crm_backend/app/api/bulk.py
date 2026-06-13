@@ -20,7 +20,7 @@ from app.services.bulk_service import BulkService
 
 # Import the Celery tasks
 from app.tasks.whatsapp_tasks import process_bulk_whatsapp_job
-from app.tasks.email_tasks import send_email_task
+from app.tasks.email_tasks import send_email_task, process_bulk_email_job
 
 router = APIRouter()
 
@@ -59,31 +59,27 @@ def create_bulk_job(
             target_time = None 
 
     channel = getattr(job_request, "channel", "whatsapp") or "whatsapp"
+    emails = getattr(job_request, "emails", []) or []
+    email_subject = getattr(job_request, "email_subject", "") or ""
+    email_body = getattr(job_request, "email_body", "") or ""
 
     new_job = service.create_job(
         tenant_id=current_user.tenant_id,
+        channel=channel,
         template_name=job_request.template_name,
         language_code=job_request.language_code,
         components=getattr(job_request, "components", []),
         numbers=job_request.numbers,
+        emails=emails,
+        email_subject=email_subject,
+        email_body=email_body,
         scheduled_at=target_time,
         status=initial_status
     )
 
     if new_job.status == "queued":
         if channel == "email":
-            emails = getattr(job_request, "emails", []) or []
-            email_subject = getattr(job_request, "email_subject", "") or ""
-            email_body = getattr(job_request, "email_body", "") or ""
-            for email_addr in emails:
-                email_job = service.create_email_job(
-                    tenant_id=current_user.tenant_id,
-                    to_email=email_addr,
-                    subject=email_subject,
-                    template_name="custom",
-                    context={"body": email_body},
-                )
-                send_email_task.delay(email_job.id)
+            process_bulk_email_job.delay(new_job.id)
         else:
             process_bulk_whatsapp_job.delay(new_job.id)
 

@@ -13,7 +13,8 @@ SECURITY CONTROLS:
 """
 
 import logging
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -24,7 +25,9 @@ from app.models.auth import User
 
 # --- Domain Imports ---
 from app.services.lead_service import LeadService
-from app.schemas.crm import LeadCreate, LeadUpdate, LeadOut, DealOut
+from app.services.audit_service import AuditService
+from app.schemas.crm import LeadCreate, LeadUpdate, LeadOut, DealOut, BulkLeadDelete, BulkLeadUpdate, BulkLeadCreate
+from app.schemas.audit import AuditLogOut
 
 # Initialize Router
 router = APIRouter()
@@ -40,6 +43,10 @@ def get_service(db: Session = Depends(get_db)) -> LeadService:
     The Service handles initializing its own Repositories internally.
     """
     return LeadService(db)
+
+def get_audit_service(db: Session = Depends(get_db)) -> AuditService:
+    """Factory function to instantiate AuditService for timeline queries."""
+    return AuditService(db)
 
 # --- Endpoints ---
 
@@ -71,6 +78,9 @@ def create_lead(
 def list_leads(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    statuses: Optional[List[str]] = Query(default=None, alias="statuses"),
+    owner_id: Optional[int] = Query(default=None),
+    created_after: Optional[datetime] = Query(default=None),
     service: LeadService = Depends(get_service),
     current_user: User = Depends(get_current_user)
 ):
@@ -79,11 +89,70 @@ def list_leads(
     """
     if not current_user.tenant_id:
         return []
-        
+
+    # Sanitize empty list to None so repo skips the filter
+    safe_statuses = statuses if statuses else None
+
     return service.list_leads(
         tenant_id=current_user.tenant_id, 
         limit=limit, 
-        skip=skip
+        skip=skip,
+        statuses=safe_statuses,
+        owner_id=owner_id,
+        created_after=created_after
+    )
+
+@router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
+def bulk_import_leads(
+    payload: BulkLeadCreate,
+    service: LeadService = Depends(get_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Import a batch of pre-mapped leads into the system.
+    """
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has no tenant.")
+        
+    created_count = service.bulk_create_leads(
+        tenant_id=current_user.tenant_id,
+        owner_id=current_user.id,
+        leads_data=payload.leads
+    )
+    return {"status": "success", "imported_count": created_count}
+
+@router.post("/bulk-delete", status_code=status.HTTP_200_OK)
+def bulk_delete_leads(
+    payload: BulkLeadDelete,
+    service: LeadService = Depends(get_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete multiple leads at once.
+    """
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has no tenant.")
+    
+    deleted_count = service.bulk_delete_leads(current_user.tenant_id, payload.lead_ids)
+    return {"status": "success", "deleted_count": deleted_count}
+
+@router.patch("/bulk-update", response_model=List[LeadOut])
+def bulk_update_leads(
+    payload: BulkLeadUpdate,
+    service: LeadService = Depends(get_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update multiple leads at once.
+    """
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has no tenant.")
+    
+    # payload.updates is a plain Dict[str, Any] — pass it directly
+    return service.bulk_update_leads(
+        tenant_id=current_user.tenant_id,
+        lead_ids=payload.lead_ids,
+        updates=payload.updates
     )
 
 @router.patch("/{lead_id}", response_model=LeadOut)
@@ -161,3 +230,25 @@ def convert_lead_to_deal(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail="Failed to promote lead."
         )
+
+@router.get("/{lead_id}/timeline", response_model=List[AuditLogOut])
+def get_lead_timeline(
+    lead_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    audit_service: AuditService = Depends(get_audit_service),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get the audit log timeline for a specific Lead.
+
+    Phase 11: Returns chronological history of all actions (create, update, convert)
+    performed on this lead, scoped by tenant isolation.
+    """
+    if not current_user.tenant_id:
+        return []
+
+    return audit_service.get_lead_timeline(
+        lead_id=lead_id,
+        tenant_id=current_user.tenant_id,
+        limit=limit,
+    )

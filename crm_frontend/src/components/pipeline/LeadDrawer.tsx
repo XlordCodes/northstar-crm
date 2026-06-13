@@ -8,7 +8,9 @@ import { LeadOut, LeadStatus, LeadUpdate } from '@/types/crm';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
+import { useLeadTimeline } from '@/hooks/useLeadTimeline';
+import { AuditLogOut } from '@/types/audit';
 import {
     Select,
     SelectContent,
@@ -28,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CommunicationTabs } from './CommunicationTabs';
 
 interface LeadDrawerProps {
     lead: LeadOut | null;
@@ -40,6 +43,9 @@ export function LeadDrawer({ lead, isOpen, onClose, onLeadUpdate }: LeadDrawerPr
     const queryClient = useQueryClient();
     const [dealValue, setDealValue] = useState<string>('');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    // Phase 11: Fetch dynamic timeline data
+    const { data: timeline, isLoading: isTimelineLoading } = useLeadTimeline(lead?.id ?? null);
 
     // Update Status Mutation
     const updateStatusMutation = useMutation({
@@ -186,15 +192,21 @@ export function LeadDrawer({ lead, isOpen, onClose, onLeadUpdate }: LeadDrawerPr
                             <TabsList className="bg-transparent h-auto p-0 gap-6">
                                 <TabsTrigger
                                     value="details"
-                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 rounded-none border-b-2 border-transparent px-0 pb-3 pt-2 text-slate-500 hover:text-slate-700"
+                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 rounded-none border-b-2 border-transparent px-0 pb-3 pt-2 text-slate-500 hover:text-slate-700 focus-visible:ring-0 focus-visible:ring-offset-0"
                                 >
                                     Details
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="timeline"
-                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 rounded-none border-b-2 border-transparent px-0 pb-3 pt-2 text-slate-500 hover:text-slate-700"
+                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 rounded-none border-b-2 border-transparent px-0 pb-3 pt-2 text-slate-500 hover:text-slate-700 focus-visible:ring-0 focus-visible:ring-offset-0"
                                 >
                                     Timeline
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="chat"
+                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-slate-900 data-[state=active]:text-slate-900 rounded-none border-b-2 border-transparent px-0 pb-3 pt-2 text-slate-500 hover:text-slate-700 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                >
+                                    Chat / Email
                                 </TabsTrigger>
                             </TabsList>
                         </div>
@@ -216,19 +228,36 @@ export function LeadDrawer({ lead, isOpen, onClose, onLeadUpdate }: LeadDrawerPr
                             </TabsContent>
 
                             <TabsContent value="timeline" className="m-0 outline-none">
-                                <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
-                                    {/* Mocked Timeline */}
-                                    <div className="relative">
-                                        <div className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-slate-300 ring-4 ring-white" />
-                                        <p className="text-sm font-medium text-slate-900">Email sent</p>
-                                        <p className="text-xs text-slate-500 mt-1">Just now</p>
+                                {isTimelineLoading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
                                     </div>
-                                    <div className="relative">
-                                        <div className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-slate-300 ring-4 ring-white" />
-                                        <p className="text-sm font-medium text-slate-900">Lead created</p>
-                                        <p className="text-xs text-slate-500 mt-1">{format(new Date(lead.created_at), 'MMM d, yyyy')}</p>
+                                ) : !timeline || timeline.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <p className="text-sm text-slate-400">No activity recorded yet.</p>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="relative pl-4 border-l-2 border-slate-100 space-y-6">
+                                        {timeline.map((log: AuditLogOut) => (
+                                            <div key={log.id} className="relative">
+                                                <div className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-slate-300 ring-4 ring-white" />
+                                                <p className="text-sm font-medium text-slate-900">
+                                                    {getTimelineLabel(log)}
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                                                    {log.actor?.email && (
+                                                        <span className="text-slate-400"> · {log.actor.email}</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="chat" className="m-0 outline-none h-full">
+                                <CommunicationTabs lead={lead} />
                             </TabsContent>
                         </div>
                     </Tabs>
@@ -236,4 +265,27 @@ export function LeadDrawer({ lead, isOpen, onClose, onLeadUpdate }: LeadDrawerPr
             </SheetContent>
         </Sheet>
     );
+}
+
+/**
+ * Converts a raw AuditLogOut entry into a human-readable timeline label.
+ */
+function getTimelineLabel(log: AuditLogOut): string {
+    if (log.action === 'create') return 'Lead created';
+
+    if (log.action === 'update') {
+        const changes = log.changes as Record<string, { old?: unknown; new?: unknown }> | null;
+        if (changes?.status) {
+            return `Status changed to "${String(changes.status.new)}"`;
+        }
+        const fields = changes ? Object.keys(changes) : [];
+        if (fields.length > 0) {
+            return `Updated ${fields.join(', ')}`;
+        }
+        return 'Lead updated';
+    }
+
+    if (log.action === 'convert') return 'Lead converted to deal';
+
+    return log.action;
 }

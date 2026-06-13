@@ -13,6 +13,8 @@ from fastapi import APIRouter
 
 # 1. Auth & Core
 from app.authentication.router import router as auth_router
+from app.api.roles import router as roles_router
+from app.api.tenants import router as tenants_router
 
 # 2. Integrations (Pod C)
 from app.api.emailer import router as emailer_router
@@ -48,8 +50,10 @@ api_router = APIRouter()
 
 # --- Register Routes ---
 
-# Authentication
+# Authentication & Identity
 api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(roles_router, prefix="/roles", tags=["Roles"])
+api_router.include_router(tenants_router, tags=["Tenants"])
 
 # Integrations
 api_router.include_router(emailer_router, prefix="/email", tags=["Emailer"])

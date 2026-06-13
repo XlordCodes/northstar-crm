@@ -1,15 +1,15 @@
-import { useAnalytics } from '@/hooks/useAnalytics';
+import { useDashboardKPIs } from '@/hooks/useDashboardKPIs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, CheckCircle2, Eye, AlertCircle } from 'lucide-react';
+import { Users, User, TrendingUp, DollarSign } from 'lucide-react';
 
 export function KPIRow() {
-    const { data, isLoading } = useAnalytics();
+    const { data, isLoading } = useDashboardKPIs();
 
     const metrics = [
-        { title: 'Messages Sent', value: data?.sent, icon: Send },
-        { title: 'Delivered', value: data?.delivered, icon: CheckCircle2 },
-        { title: 'Messages Read', value: data?.read, icon: Eye },
-        { title: 'Failed Deliveries', value: data?.failed, icon: AlertCircle },
+        { title: 'Total Contacts', value: data?.total_contacts, icon: Users },
+        { title: 'Team Members', value: data?.total_users, icon: User },
+        { title: 'Active Deals', value: data?.active_deals, icon: TrendingUp },
+        { title: 'Revenue', value: data?.total_revenue_cents ? `$${(data.total_revenue_cents / 100).toLocaleString()}` : '$0', icon: DollarSign },
     ];
 
     if (isLoading) {

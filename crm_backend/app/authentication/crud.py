@@ -1,10 +1,13 @@
 # app/authentication/crud.py
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 from fastapi import HTTPException
 from typing import Optional, List
 
 from .. import models
+from . import schemas
+from . import hashing
 from ..repos.role_repo import RoleRepo
 
 
@@ -25,6 +28,94 @@ def get_all_users(db: Session) -> List[models.User]:
     Fetches all users from the database.
     """
     return db.query(models.User).options(joinedload(models.User.role)).all()
+
+
+def update_user_profile(db: Session, user_id: int, user_update: schemas.UserUpdate) -> models.User:
+    """
+    Updates a user's profile information (name and phone number only).
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user_update.name is not None:
+        user.name = user_update.name
+    
+    if user_update.phone_number is not None:
+        user.phone_number = user_update.phone_number
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_password(db: Session, user_id: int, password_update: schemas.PasswordUpdate) -> None:
+    """
+    Updates a user's password after verifying current password.
+    Raises 400 if current password is invalid.
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password matches stored hash
+    if not hashing.verify_password(password_update.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Hash and update new password
+    user.hashed_password = hashing.hash_password(password_update.new_password)
+    db.commit()
+
+
+def get_roles(db: Session, tenant_id: int) -> list[models.Role]:
+    """
+    Get all available roles for a tenant.
+    Includes both global roles (tenant_id NULL) and tenant-specific roles.
+    """
+    return db.query(models.Role).filter(or_(models.Role.tenant_id == tenant_id, models.Role.tenant_id.is_(None))).all()
+
+
+def get_tenant_users(db: Session, tenant_id: int) -> list[models.User]:
+    """
+    Get all users belonging to a specific tenant.
+    """
+    return db.query(models.User)\
+        .filter(models.User.tenant_id == tenant_id)\
+        .options(joinedload(models.User.role))\
+        .all()
+
+
+def invite_user(db: Session, tenant_id: int, invite_data: schemas.UserInvite) -> tuple[models.User, str]:
+    """
+    Invite a new user to the tenant workspace.
+    Generates a secure temporary password.
+    Returns (created_user, temporary_password) tuple.
+    """
+    import secrets
+    import string
+    
+    # Generate secure 12 character temporary password
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    temporary_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+    
+    hashed_password = hashing.hash_password(temporary_password)
+    
+    user = models.User(
+        name=invite_data.name,
+        email=invite_data.email,
+        tenant_id=tenant_id,
+        role_id=invite_data.role_id,
+        hashed_password=hashed_password
+    )
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Load role relationship before returning
+    db.refresh(user, ['role'])
+    
+    return user, temporary_password
 
 
 def create_user(
@@ -66,47 +157,7 @@ def create_user(
         )
 
 
-def _resolve_admin_role(db: Session, tenant_id: int) -> models.Role:
-    """
-    Resolves the 'admin' role for a new workspace using the RoleRepo pattern.
 
-    Lookup order (case-insensitive via RoleRepo.get_by_name):
-    1. Global system role (tenant_id=None) — seeded by seed_database.py
-    2. Tenant-scoped role — in case a previous provisioning created one
-    3. Create a new tenant-scoped admin role as a last resort
-
-    Uses db.flush() instead of db.commit() to stay within the caller's
-    atomic transaction boundary.
-
-    Args:
-        db: The active SQLAlchemy session (inside an open transaction).
-        tenant_id: The ID of the newly created tenant.
-
-    Returns:
-        Role: The resolved admin Role object with a valid .id.
-    """
-    role_repo = RoleRepo(db)
-
-    # 1. Check for a global admin role (tenant_id=NULL, seeded data)
-    admin_role = role_repo.get_by_name("admin", tenant_id=None)
-    if admin_role:
-        return admin_role
-
-    # 2. Check for a tenant-scoped admin role
-    admin_role = role_repo.get_by_name("admin", tenant_id=tenant_id)
-    if admin_role:
-        return admin_role
-
-    # 3. No admin role exists anywhere — create one scoped to this tenant.
-    #    Use model + flush (NOT role_repo.create_role which calls commit).
-    admin_role = models.Role(
-        name="admin",
-        tenant_id=tenant_id,
-        description="Workspace Administrator",
-    )
-    db.add(admin_role)
-    db.flush()  # Generate admin_role.id without committing
-    return admin_role
 
 
 def register_workspace(
@@ -151,19 +202,35 @@ def register_workspace(
         db.add(tenant)
         db.flush()  # Generate tenant.id
 
-        # Step 2: Resolve the admin role (case-insensitive, repo pattern)
-        admin_role = _resolve_admin_role(db, tenant.id)
+        # Step 2: Explicitly query for admin role using existing repo pattern
+        # Dynamically resolve admin role - NEVER hardcode role_id values
+        role_repo = RoleRepo(db)
+        
+        # Lookup hierarchy: global system role first, then tenant-scoped
+        admin_role = role_repo.get_by_name("admin", tenant_id=None)
+        if not admin_role:
+            admin_role = role_repo.get_by_name("admin", tenant_id=tenant.id)
+            
+        # If no admin role exists, create one scoped to this tenant
+        if not admin_role:
+            admin_role = models.Role(
+                name="admin",
+                tenant_id=tenant.id,
+                description="Workspace Administrator",
+            )
+            db.add(admin_role)
+            db.flush()  # Generate admin_role.id without committing
 
-        # Step 3: Create the User bound to the new tenant with admin role
-        user = models.User(
+        # Step 3: Create the User bound to the new tenant with explicit admin role assignment
+        # Use create_user utility for consistent validation and error handling
+        user = create_user(
+            db=db,
             name=name,
             email=email,
             hashed_password=hashed_password,
             tenant_id=tenant.id,
             role_id=admin_role.id,
         )
-        db.add(user)
-        db.flush()  # Generate user.id
 
         # All operations succeeded — caller commits
         return user

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Network, DollarSign, Package, Inbox, Megaphone, Activity, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, Network, DollarSign, Package, Inbox, Megaphone, Activity, LogOut, Settings as SettingsIcon } from "lucide-react"
 import { NavLink, useNavigate } from "react-router-dom"
 import {
   DropdownMenu,
@@ -62,11 +62,19 @@ export function Sidebar() {
                         <Package className="w-[18px] h-[18px] mr-3" strokeWidth={2} />
                         <span className="text-[13px] font-medium tracking-tight">Inventory</span>
                     </NavLink>
-                    <NavLink to="/campaigns" className={({ isActive }) => `flex items-center px-4 py-2.5 mx-4 rounded-md ${isActive ? 'text-zinc-900 bg-zinc-100 opacity-100' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100/50 opacity-80 hover:opacity-100'} transition-all group`}>
-                        <Megaphone className="w-[18px] h-[18px] mr-3" strokeWidth={2} />
-                        <span className="text-[13px] font-medium tracking-tight">Campaigns</span>
-                    </NavLink>
-                </RoleGuard>
+                <NavLink to="/campaigns" className={({ isActive }) => `flex items-center px-4 py-2.5 mx-4 rounded-md ${isActive ? 'text-zinc-900 bg-zinc-100 opacity-100' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100/50 opacity-80 hover:opacity-100'} transition-all group`}>
+                    <Megaphone className="w-[18px] h-[18px] mr-3" strokeWidth={2} />
+                    <span className="text-[13px] font-medium tracking-tight">Campaigns</span>
+                </NavLink>
+            </RoleGuard>
+
+            <div className="pt-2 mt-2 border-t border-zinc-100">
+                <p className="px-8 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Account</p>
+            </div>
+            <NavLink to="/settings" className={({ isActive }) => `flex items-center px-4 py-2.5 mx-4 rounded-md ${isActive ? 'text-zinc-900 bg-zinc-100 opacity-100' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100/50 opacity-80 hover:opacity-100'} transition-all group`}>
+                <SettingsIcon className="w-[18px] h-[18px] mr-3" strokeWidth={2} />
+                <span className="text-[13px] font-medium tracking-tight">Settings</span>
+            </NavLink>
 
                 <RoleGuard allowedRoles={['admin']}>
                     <SystemQueuesSheet>
@@ -102,8 +110,13 @@ export function Sidebar() {
                         <DropdownMenuLabel className="font-semibold text-zinc-900 text-xs px-2 py-1.5">My Account</DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-zinc-100" />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem className="text-xs cursor-pointer rounded-lg mx-1 focus:bg-zinc-100 font-medium">Profile</DropdownMenuItem>
-                            <DropdownMenuItem className="text-xs cursor-pointer rounded-lg mx-1 focus:bg-zinc-100 font-medium">Preferences</DropdownMenuItem>
+                            <DropdownMenuItem 
+                                onClick={() => navigate('/settings')}
+                                className="text-xs cursor-pointer rounded-lg mx-1 focus:bg-zinc-100 font-medium"
+                            >
+                                <SettingsIcon className="w-3.5 h-3.5 mr-2" />
+                                Settings
+                            </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator className="bg-zinc-100" />
                         <DropdownMenuItem

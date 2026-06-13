@@ -5,6 +5,7 @@ export interface User {
     id: number;
     email: string;
     name: string | null;
+    phone_number?: string | null;
     tenant_id: number | null;
     role_id: number | null;
     role_name?: string | null;
@@ -20,13 +21,29 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
     logout: () => void;
+    updateUser: (updatedUser: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const parseUser = (data: any): User => {
-    const role_name = data.role_name || data.role?.name || null;
-    return { ...data, role_name };
+    // Explicitly extract role_name with full fallback chain
+    // Guarantees role_name is never lost during deserialization
+    let role_name: string | null = null;
+    
+    if (data.role_name) {
+        role_name = data.role_name;
+    } else if (data.role?.name) {
+        role_name = data.role.name;
+    } else if (data.role) {
+        role_name = data.role;
+    }
+    
+    return {
+        ...data,
+        role_name,
+        role: data.role || null
+    };
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -79,10 +96,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
     };
 
+    const updateUser = (updatedUser: User) => {
+        setUser(parseUser(updatedUser));
+    };
+
     const isAuthenticated = !!user && !!token;
 
     return (
-        <AuthContext.Provider value={{ user, token, isAuthenticated, isLoading, login, register, logout }}>
+        <AuthContext.Provider value={{ user, token, isAuthenticated, isLoading, login, register, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

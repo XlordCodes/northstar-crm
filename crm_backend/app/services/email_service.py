@@ -3,18 +3,16 @@
 Module: Email Service
 Context: Pod C - Notifications
 
-Handles transactional email delivery via SendGrid.
+Handles transactional email delivery via Resend.
 Includes Jinja2 template rendering and automatic retries for API resilience.
 """
 
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
-import sendgrid
-from sendgrid.helpers.mail import Mail, Email, To, Content
+import resend
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from python_http_client.exceptions import HTTPError
 
 from app.core.config import settings
 
@@ -30,11 +28,8 @@ class Emailer:
     Singleton-style service for handling email dispatch.
     """
     def __init__(self):
-        self.api_key = settings.SENDGRID_API_KEY
-        # If no key is configured, we simply log warnings instead of crashing.
-        self.client = sendgrid.SendGridAPIClient(api_key=self.api_key) if self.api_key else None
-        
         # Initialize Jinja2
+        TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
         self.template_env = Environment(
             loader=FileSystemLoader(str(TEMPLATE_DIR)),
             autoescape=select_autoescape(["html", "xml"])
@@ -43,10 +38,11 @@ class Emailer:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((HTTPError, ConnectionError))
+        retry=retry_if_exception_type((ConnectionError,))
     )
     def send_mail(
         self, 
+        api_key: str,
         to_email: str, 
         subject: str, 
         template_name: str, 
@@ -54,35 +50,43 @@ class Emailer:
         from_email: Optional[str] = None
     ):
         """
-        Renders a template and sends an email via SendGrid.
+        Renders a template and sends an email via Resend natively for the supplied tenant.
         """
-        if not self.client:
-            logger.warning(f"⚠️ SendGrid API Key missing. Email to {to_email} suppressed.")
+        if not api_key:
+            logger.warning(f"⚠️ Resend API Key missing. Email to {to_email} suppressed.")
             return
 
-        sender = from_email or settings.DEFAULT_SENDER_EMAIL or "noreply@example.com"
+        # Set the key for this execution
+        resend.api_key = api_key
+
+        sender = from_email or settings.DEFAULT_SENDER_EMAIL or "onboarding@resend.dev"
         
         try:
             # 1. Render Template
-            template = self.template_env.get_template(template_name)
-            html_content = template.render(context or {})
+            # For bulk campaigns, template_name='custom' means the body is
+            # user-supplied HTML passed via context['body']. We skip Jinja
+            # rendering to avoid TemplateNotFound and double-escaping.
+            if template_name == "custom":
+                raw_body = (context or {}).get("body", "")
+                html_content = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px">
+{raw_body}
+</body></html>"""
+            else:
+                template = self.template_env.get_template(template_name)
+                html_content = template.render(context or {})
             
-            # 2. Construct Message
-            message = Mail(
-                from_email=Email(sender),
-                to_emails=[To(to_email)],
-                subject=subject,
-                html_content=Content("text/html", html_content)
-            )
+            # 2. Construct Message and Send (with Retry)
+            response = resend.Emails.send({
+                "from": sender,
+                "to": to_email,
+                "subject": subject,
+                "html": html_content
+            })
             
-            # 3. Send (with Retry)
-            response = self.client.send(message)
-            
-            if response.status_code not in (200, 201, 202):
-                raise HTTPError(response.status_code, "SendGrid refused the request", response.body, response.headers)
-                
-            logger.info(f"✅ Email sent to {to_email} (Template: {template_name})")
+            logger.info(f"✅ Email sent to {to_email} (Template: {template_name}) - Resend ID: {response.get('id', 'unknown')}")
             
         except Exception as e:
             logger.error(f"❌ Email Failed to {to_email}: {str(e)}")
-            raise # Re-raise to trigger Tenancy retry
+            raise # Re-raise to trigger Tenacity retry

@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 from app.integrations.whatsapp_client import whatsapp_client
 from app.authentication.router import get_current_user
 from app.models.auth import User
+from sqlalchemy.orm import Session
+from app.database import get_db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,6 +34,13 @@ class WhatsAppTemplateSendIn(BaseModel):
     
     # Flexible list for template variables (text, currency, etc.)
     parameters: Optional[List[Any]] = Field(default=None, description="List of variable values for the template body")
+
+class WhatsAppTextSendIn(BaseModel):
+    """
+    Request schema for sending a plain text message.
+    """
+    to_number: str = Field(..., description="Target WhatsApp number (e.g., '15550123456')")
+    message: str = Field(..., description="The message content to send")
 
 @router.post("/whatsapp/send-template", status_code=status.HTTP_200_OK)
 async def send_whatsapp_template(
@@ -79,3 +88,67 @@ async def send_whatsapp_template(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"Failed to send message: {str(e)}"
         )
+
+@router.post("/whatsapp/send-text", status_code=status.HTTP_200_OK)
+async def send_whatsapp_text(
+    payload: WhatsAppTextSendIn,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sends a plain text WhatsApp message and logs it to the database.
+    """
+    try:
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
+        if not tenant or not tenant.wa_phone_number_id or not tenant.wa_access_token:
+            raise HTTPException(status_code=400, detail="WhatsApp credentials not configured for tenant")
+            
+        response = await whatsapp_client.send_text_message(
+            phone_number_id=tenant.wa_phone_number_id,
+            access_token=tenant.wa_access_token,
+            to_phone=payload.to_number,
+            message=payload.message
+        )
+        
+        from app.services.chat_service import ChatService
+        from app.models.chat import ChatMessage
+        from datetime import datetime, timezone
+        
+        chat_svc = ChatService(db)
+        convo = chat_svc.upsert_conversation(current_user.tenant_id, payload.to_number)
+        
+        msg_id = None
+        if response and isinstance(response, dict):
+            messages = response.get("messages", [])
+            if messages:
+                msg_id = messages[0].get("id")
+
+        msg = ChatMessage(
+            tenant_id=current_user.tenant_id,
+            conversation_id=convo.id,
+            from_number="system",  # Denotes outgoing
+            text=payload.message,
+            message_id=msg_id,
+            message_type="outgoing_text",
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(msg)
+        convo.last_message_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(msg)
+        
+        return {
+            "status": "sent",
+            "provider_response": response,
+            "message_id": msg.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"WhatsApp API Error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to send text message: {str(e)}"
+        )
+

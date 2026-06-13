@@ -3,9 +3,9 @@ name: Backend CI/CD Tests
 # This workflow runs every time you push to develop/main or open a Pull Request
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: ["main", "develop"]
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: ["main", "develop"]
 
 jobs:
   test:
@@ -27,7 +27,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          
+
       redis:
         image: redis:latest
         ports:
@@ -59,24 +59,24 @@ jobs:
 
           DATABASE_URL: postgresql://postgres:password123@localhost:5432/crm_test
           REDIS_URL: redis://localhost:6379/0
-          
+
           # --- Dummy Secrets to satisfy Pydantic Validation ---
           ENCRYPTION_KEY: gAAAAABl-x1-y2-z3-ExampleKeyForDevOnly12345=
           JWT_SECRET_KEY: test_jwt_secret_key_12345
           JWT_ALGORITHM: HS256
           ACCESS_TOKEN_EXPIRE_MINUTES: 30
-          
-          SENDGRID_API_KEY: SG.dummy_test_key_xyz
+
+          RESEND_API_KEY: re.dummy_test_key_xyz
           DEFAULT_SENDER_EMAIL: test@example.com
           OPENAI_API_KEY: sk-test-dummy-key
-          
+
           WHATSAPP_TOKEN: test_token
           WHATSAPP_APP_SECRET: test_secret
           WHATSAPP_PHONE_NUMBER_ID: 123456789
           WHATSAPP_VERIFY_TOKEN: test_verify_token
-          
-          BACKEND_CORS_ORIGINS: '[]'
-        
+
+          BACKEND_CORS_ORIGINS: "[]"
+
         run: |
           # Run the test suite
           pytest -v

@@ -20,6 +20,9 @@ from .audit import AuditLog, ActivityFeed
 # 4. CRM & Communication (Pod A & Pod B Module 1)
 from .crm import Contact, Lead, Deal
 from .chat import Message, Conversation, ChatMessage
+
+# 4b. BYON: Email Templates (Pod C - Phase 17)
+from .email_template import EmailTemplate
 from .bulk import BulkJob, BulkMessage, EmailQueue
 
 # 5. Extensions
@@ -41,5 +44,6 @@ __all__ = [
     "BulkJob", "BulkMessage", "EmailQueue",
     "MessageStatus", "MessageEmbedding", "ReplySuggestion",
     "Invoice", "InvoiceItem", "Payment", "LedgerEntry",
-    "Product", "StockTransaction"
+    "Product", "StockTransaction",
+    "EmailTemplate"
 ]

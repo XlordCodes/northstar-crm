@@ -12,6 +12,7 @@ import { Finance } from "./pages/Finance"
 import { Inventory } from "./pages/Inventory"
 import { InboxPage } from "./pages/InboxPage"
 import { Campaigns } from "./pages/Campaigns"
+import Settings from "./pages/Settings"
 
 import { Toaster } from "@/components/ui/sonner"
 
@@ -33,6 +34,7 @@ function App() {
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="inbox" element={<InboxPage />} />
                 <Route path="campaigns" element={<Campaigns />} />
+                <Route path="settings" element={<Settings />} />
               </Route>
             </Route>
           </Routes>

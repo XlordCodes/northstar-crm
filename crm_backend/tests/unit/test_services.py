@@ -56,29 +56,18 @@ def test_email_handler_queues_job(mocker):
 
 
 # --- 2. Test the Emailer Class (Worker Logic) ---
-def test_emailer_sends_via_sendgrid(mocker):
+def test_emailer_sends_via_resend(mocker):
     """
     Test the Emailer class separately. 
-    This mocks SendGrid and Jinja2 to ensure the .send_mail() method works.
+    This mocks Resend and Jinja2 to ensure the .send_mail() method works.
     """
     
     # 1. Mock external dependencies to prevent file/network errors
     mocker.patch("app.services.email_service.FileSystemLoader") 
-    mocker.patch("app.services.email_service.settings.SENDGRID_API_KEY", "fake_key")
+    mocker.patch("app.services.email_service.settings.RESEND_API_KEY", "fake_key")
     
-    # 2. Mock SendGrid Client
-    mock_sg_client = mocker.Mock()
-    
-    # If we don't do this, the retry logic thinks it failed and loops until crash.
-    mock_response = mocker.Mock()
-    mock_response.status_code = 202
-    mock_response.body = b"Accepted"
-    mock_response.headers = {}
-    
-    mock_sg_client.send.return_value = mock_response
-    # --- FIX END ---
-
-    mocker.patch("app.services.email_service.sendgrid.SendGridAPIClient", return_value=mock_sg_client)
+    # 2. Mock Resend Client
+    mock_resend_send = mocker.patch("app.services.email_service.resend.Emails.send", return_value={"id": "test_id"})
     
     # 3. Mock Jinja2 Environment
     # We want to mock the .get_template().render() chain
@@ -102,8 +91,8 @@ def test_emailer_sends_via_sendgrid(mocker):
     # 6. Assertions
     # Verify template was rendered
     mock_template.render.assert_called_once()
-    # Verify SendGrid's .send() was called
-    mock_sg_client.send.assert_called_once()
+    # Verify Resend's .send() was called
+    mock_resend_send.assert_called_once()
 
 
 # --- 3. WhatsApp Tests ---

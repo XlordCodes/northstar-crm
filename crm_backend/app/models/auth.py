@@ -45,6 +45,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
     
     # Global Uniqueness on Email simplifies the Login flow (No need to ask "Which Workspace?").
     email = Column(String, unique=True, index=True, nullable=False)

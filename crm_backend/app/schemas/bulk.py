@@ -39,6 +39,7 @@ class BulkJobResponse(BaseModel):
     """Schema for the response after creating a job."""
     id: int
     tenant_id: int          # <--- ADDED (Matches DB)
+    channel: str = "whatsapp"
     template_name: str
     language_code: str
     components: Optional[List[dict]] = None
