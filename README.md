@@ -1,170 +1,126 @@
-CRM BASE – POD C PROJECT
-A modern FastAPI microservice for customer messaging, WhatsApp/Meta integration, templated email, and LLM-powered chat.
+# Northstar CRM Microservice Ecosystem
 
-Tech Stack
-Language: Python 3.11+
+**Northstar CRM** is an enterprise-grade, distributed customer relationship management ecosystem engineered with Python and FastAPI. The platform powers high-throughput omni-channel customer messaging (WhatsApp Cloud API integration), idempotent webhook processing, templated email delivery via Resend, and LLM-driven autonomous customer agent workflows.
 
-API Framework: FastAPI (async Python APIs)
+---
 
-Web Server: Uvicorn
+## 1. System Architecture & Inter-Service Communication
 
-ORM: SQLAlchemy (+ Alembic migrations)
+The ecosystem combines **synchronous REST APIs** (FastAPI/HTTP) for user-facing and external client requests with an **asynchronous event-driven messaging layer** (Celery over Redis) for background job execution, webhook processing, and schedule management.
 
-Database: PostgreSQL (Dockerized)
+```mermaid
+graph TD
+    Client[Web Client / External API] -->|HTTP REST| API[CRM Backend API :8000]
+    Meta[Meta WhatsApp Webhook] -->|HMAC Verified POST| API
+    
+    API -->|SQL/vector| DB[(PostgreSQL + pgvector :5433)]
+    API -->|Publish Tasks| Redis[(Redis Broker/Cache :6379)]
+    
+    Beat[Celery Beat Scheduler] -->|Enqueue Periodic Jobs| Redis
+    Redis -->|Consume Tasks| Worker[Celery Background Worker]
+    
+    Worker -->|Read/Write| DB
+    Worker -->|HTTP Outbound| Resend[Resend Email API]
+    Worker -->|HTTP Outbound| OpenAI[OpenAI / Cohere LLM API]
+    Worker -->|HTTP Outbound| WA[WhatsApp Cloud API]
+```
 
-HTTP: httpx, requests
+---
 
-Containerization: Docker, Docker Compose
+## 2. Service Catalog & Endpoint Directory
 
-Secret Mgmt: .env, python-dotenv
+| Service Name | Container Name | Local Port | Internal Port | Primary Responsibility | Data Store / ORM | OpenAPI / Swagger Docs Path |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **CRM Backend API** | `crm_backend_api` | `8000` | `8000` | Synchronous REST endpoints, webhook ingestion, contacts CRUD, LLM facade | PostgreSQL (`pgvector`) via SQLAlchemy & Alembic | [`http://localhost:8000/docs`](http://localhost:8000/docs) (ReDoc: [`/redoc`](http://localhost:8000/redoc)) |
+| **Celery Worker** | `crm_celery_worker` | N/A | N/A | Asynchronous task execution (email dispatch, AI replies, background webhooks) | Redis (`db 0`), PostgreSQL | N/A (Background Worker) |
+| **Celery Beat** | `crm_celery_beat` | N/A | N/A | Recurring cron task orchestration and queue scheduling | Redis (`db 0`) | N/A (Scheduler) |
+| **PostgreSQL Database** | `crm_postgres_db` | `5433` | `5432` | Relational CRM data store & vector embeddings (`ankane/pgvector`) | Disk volume (`postgres_data`) | N/A (Database Engine) |
+| **Redis Cache & Queue** | `crm_redis` | `6379` | `6379` | Message broker for Celery queues and ephemeral cache layer | Disk volume (`redis_data`) | N/A (Broker Engine) |
+| **CRM Frontend UI** | `crm_frontend` | `5173` | `5173` | Interactive Agent Dashboard & Customer Management Interface | Vite / React + TypeScript | N/A (Frontend Application) |
 
-Email: Resend API + Jinja2
+---
 
-LLM: OpenAI API/Cohere
+## 3. Local Development Setup Scripts
 
-Testing: Pytest, pytest-mock
+### Prerequisites
+- Docker Engine 20.10+ & Docker Compose v2.0+
+- Python 3.11+ (for non-containerized local execution/pytest)
 
-DevTools: VS Code, pre-commit linting
+### One-Touch Shell Bootstrap Script
 
-Features
-WhatsApp Cloud API template-message sender
+Execute the following commands from the repository root to initialize environment variables, start the containerized stack, apply database schema migrations, and verify system health:
 
-Webhook endpoint for ingestion/idempotent storage of WhatsApp messages
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-CRUD endpoint for Contacts (customer phonebook)
+echo "==> 1. Setting up environment variables..."
+if [ ! -f crm_backend/.env ]; then
+    cp crm_backend/.env.example crm_backend/.env
+    echo "Created crm_backend/.env from template. Please populate secrets."
+fi
 
-Email send endpoint (Jinja2 HTML + Resend)
+echo "==> 2. Bootstrapping Docker Compose stack..."
+cd crm_backend
+docker compose down -v --remove-orphans
+docker compose up -d --build
 
-LLM text reply endpoint (OpenAI/Cohere API)
+echo "==> 3. Awaiting Database readiness..."
+docker compose exec db pg_isready -U postgres -d crm_main -h localhost || sleep 3
 
-All endpoints covered by unit and integration tests
+echo "==> 4. Executing Database Migrations (Alembic)..."
+docker compose exec app alembic upgrade head
 
-Production/dev config via Docker Compose + .env
+echo "==> 5. Verifying system health..."
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/docs
 
-Folder Structure
-text
-crm-main/
-├── app/
-│   ├── main.py
-│   ├── models.py
-│   ├── database.py
-│   ├── api/
-│   │    ├── webhooks.py
-│   │    ├── emailer.py
-│   │    ├── aiclient.py
-│   │    └── contacts.py
-│   ├── integrations/
-│   │    └── whatsapp_client.py
-│   └── templates/
-│       └── invoice_email.html
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── requirements.txt
-├── docker-compose.yml
-├── Alembic/
-│   └── versions/
-│       └── messages_table_update.py
-└── README.md
+echo "==> Setup Complete! FastAPI Swagger UI available at http://localhost:8000/docs"
+```
 
-Setup: Quick Start
-1. Clone the Repo & Install Requirements
-bash
-git clone <repo>
-cd crm-main
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-2. Create .env file
-text
-DATABASE_URL=postgresql://postgres:username@db:5432/crm_main
-RESEND_API_KEY=your_resend_key
-DEFAULT_SENDER_EMAIL=your@email.com
-OPENAI_API_KEY=your_openai_key
-WHATSAPP_TOKEN=your_whatsapp_token
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_APP_SECRET=your_app_secret
-Never commit .env or share secrets in public repos.
+### Windows PowerShell Bootstrap Script
 
-3. Start Services and Run Migrations
-bash
-docker compose up -d
-docker compose exec app alembic upgrade head  # run migrations inside the app container
-4. Run the App
-bash
-docker compose exec app uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-App docs live at:
-http://localhost:8000/docs
+```powershell
+# Set error action
+$ErrorActionPreference = "Stop"
 
-API Endpoints
-WhatsApp
-Send Template:
-POST /whatsapp/send-template
-JSON: {"to": "<recipient>", "template": "<template_name>", ...}
+Write-Host "==> 1. Checking Environment File..." -ForegroundColor Cyan
+If (!(Test-Path "crm_backend\.env")) {
+    Copy-Item "crm_backend\.env.example" "crm_backend\.env"
+    Write-Host "Created crm_backend\.env from template." -ForegroundColor Yellow
+}
 
-Receive Webhook:
-POST /webhooks/whatsapp
-Meta-signed webhook events (HMAC with WHATSAPP_APP_SECRET).
+Write-Host "==> 2. Starting Docker Services..." -ForegroundColor Cyan
+Set-Location "crm_backend"
+docker compose up -d --build
 
-Contacts (CRUD)
-POST /contacts/
+Write-Host "==> 3. Running Database Migrations..." -ForegroundColor Cyan
+Start-Sleep -Seconds 5
+docker compose exec app alembic upgrade head
 
-GET /contacts/{id}
+Write-Host "==> Setup Complete! App live at http://localhost:8000/docs" -ForegroundColor Green
+```
 
-PUT /contacts/{id}
+---
 
-DELETE /contacts/{id}
+## 4. Operational Troubleshooting & Gotchas
 
-Email
-POST /send-email
-JSON: {"to_email":"abc@example.com", "subject":"Hi", "template_name":"invoice_email.html", "context":{"name":"Alice"}}
+### Database Initialization & Race Conditions
 
-LLM
-POST /llm/ask
-JSON: {"prompt": "What's the weather like?"}
+* **Container Readiness vs. Database Engine Startup**:
+  * *Issue*: FastAPI application or Alembic migration fails immediately upon `docker compose up` with `ConnectionRefusedError` or `OperationalError: could not connect to server`.
+  * *Root Cause*: Docker container status `running` only indicates the Linux process started, not that PostgreSQL is accepting connections or has completed internal socket initialization.
+  * *Resolution*: Ensure `docker-compose.yml` utilizes explicit `healthcheck` declarations for the `db` service (`pg_isready -U ${POSTGRES_USER}`) and configures API service dependencies with `depends_on: db: condition: service_healthy`.
 
-Testing
-Run all tests
-bash
-pytest
-Run integration tests
-bash
-pytest tests/integration/
-Unit tests mock all external HTTP/DB as needed.
+* **Alembic Concurrent Migration Lock Contention**:
+  * *Issue*: Launching multiple API replicas or background workers simultaneously during startup causes Alembic schema migration failures or `LockNotAvailable` deadlocks on `alembic_version`.
+  * *Root Cause*: Multiple instances attempting to execute `alembic upgrade head` in parallel compete for transactional DDL locks.
+  * *Resolution*: Decouple migration execution from service process boot commands. Run migrations strictly via a single entrypoint script or an isolated ephemeral initialization container (`docker compose exec app alembic upgrade head`) prior to scaling worker replicas.
 
-Example Requests (curl)
-Send WhatsApp Template:
+* **Port Conflict on Host (Port 5432 vs 5433)**:
+  * *Issue*: Local PostgreSQL installation on the host machine conflicts with the Docker container.
+  * *Resolution*: The local Docker Compose configuration maps PostgreSQL host port `5433` to internal container port `5432`. Ensure `DATABASE_URL` within container networking references host `db:5432`, whereas local host applications/pytest connect to `localhost:5433`.
 
-bash
-curl -X POST http://localhost:8000/whatsapp/send-template \
-  -H "Content-Type: application/json" \
-  -d '{"to": "+911234567890", "template": "hello_world"}'
-POST Webhook (Dev only):
-
-bash
-curl -X POST http://localhost:8000/webhooks/whatsapp \
-  -H "X-Hub-Signature: <computed_signature>" \
-  -d '{"entry": [{"changes": [{"value": {"messages": [{"from": "91...", "id": "msgid", "text": {"body": "test"}}], "metadata": {"phone_number_id": "..."}}}]}]}'
-Send Email:
-
-bash
-curl -X POST http://localhost:8000/send-email \
-  -H "Content-Type: application/json" \
-  -d '{"to_email": "you@example.com", "subject": "Test", "template_name": "invoice_email.html", "context": {"name": "User"}}'
-LLM Prompt:
-
-bash
-curl -X POST http://localhost:8000/llm/ask \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Say hello in French"}'
-
-
-Dev & Security Notes
-Make sure your .env is in .gitignore!
-
-Use HTTPS and rotate tokens in production.
-
-Logs DO NOT contain sensitive .env values.
-
-Authors & License
-CRM Team, 2025
+* **Celery Worker Sync & Hot-Reload Lag**:
+  * *Issue*: Tasks executed by `crm_celery_worker` do not reflect recent codebase edits.
+  * *Root Cause*: Unlike Uvicorn (`--reload`), standard Celery worker processes do not automatically restart on file changes.
+  * *Resolution*: Restart worker containers after code changes using `docker compose restart celery_worker`, or run Celery locally with `watchfiles` in development mode.
